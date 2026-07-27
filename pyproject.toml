@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kvscope"
+version = "0.1.0"
+description = "Explain, estimate, and visualize LLM inference memory and KV cache."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "KVScope contributors" }]
+keywords = ["llm", "memory", "kv-cache", "inference"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = ["pydantic>=2,<3"]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.11,<2",
+    "pre-commit>=3.7,<5",
+    "pytest>=8,<9",
+    "pytest-cov>=5,<7",
+    "hypothesis>=6.100,<7",
+    "ruff>=0.6,<1",
+]
+
+[project.scripts]
+kvscope = "kvscope.cli.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["kvscope"]
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src/kvscope"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
