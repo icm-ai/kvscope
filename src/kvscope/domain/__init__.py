@@ -25,6 +25,7 @@ from kvscope.domain.units import (
     gib_to_bytes,
     mib_to_bytes,
 )
+from kvscope.domain.weight import WeightArtifactSummary
 
 __all__ = [
     "AnalysisReport",
@@ -46,6 +47,7 @@ __all__ = [
     "Recommendation",
     "RiskLevel",
     "WeightDType",
+    "WeightArtifactSummary",
     "bytes_to_gib",
     "bytes_to_mib",
     "gib_to_bytes",

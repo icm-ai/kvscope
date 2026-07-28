@@ -1,7 +1,7 @@
 # KVScope v0.1 Implementation Plan
 
 本文档把产品和架构文档中的 v0.1 拆分为可独立验收的阶段。当前阶段：
-Phase 0（Repository Bootstrap）与 Phase 1（Domain + KV Cache Formula）核心部分已完成。
+Phase 4（Weight Engine）已完成；后续阶段保持未开始。
 
 ## Phase 0：Repository Bootstrap — 已完成
 
@@ -14,13 +14,13 @@ Phase 0（Repository Bootstrap）与 Phase 1（Domain + KV Cache Formula）核�
 - 单元、集成、golden、fixtures 测试目录存在；
 - README、贡献指南、安全政策和 Apache-2.0 许可证齐全。
 
-## Phase 1：Domain + Formula — 实施中 / 部分已完成
+## Phase 1：Domain + KV Cache Formula — 已完成（基础能力）
 
 交付内容：
 
 - `ModelSpec`、`HardwareSpec`、`BackendSpec`、`InferenceConfig` 等不可变边界模型；
 - dtype 与单位转换；
-- 权重内存、KV Cache、block 对齐、运行时开销和系统预留计算；
+- KV Cache 与 block 对齐的纯计算；
 - 明确 batch、active sequences、GQA/MQA/MHA 语义；
 - 公式单元测试、属性测试和典型 golden 输入。
 
@@ -54,7 +54,25 @@ Phase 0（Repository Bootstrap）与 Phase 1（Domain + KV Cache Formula）核�
 独立验收：对一个可运行和一个超预算配置，CLI 与 JSON 报告给出一致的内存
 分解、结论、主要约束和建议。
 
-## Phase 4：Runtime Calibration
+## Phase 4：Weight Engine — 已完成
+
+本阶段只实现无网络、无文件 IO 的模型权重内存估算：
+
+- parameter count 与平均 bits-per-weight 模式；
+- group-wise quantization 的 scale、zero-point、group size 和混合精度；
+- 上游 `WeightArtifactSummary` 字节摘要模式；
+- integer bytes、向上取整、alignment 和可追溯结果拆分；
+- unit、property-based 和 golden tests。
+
+本阶段明确未实现 Hugging Face 网络访问、config resolver、safetensors/GGUF
+解析、hardware registry、runtime overhead、feasibility、recommendation、
+Web UI、InferPilot 和推理后端启动。
+
+独立验收：`estimate_weight_memory(...)` 对三种模式输出非负整数 bytes，结果
+区分 artifact storage bytes 与 estimated resident weight bytes，且通过 Ruff、
+mypy、pytest 和覆盖率门禁。
+
+## 后续：Runtime Calibration（未开始）
 
 交付内容：
 
@@ -66,7 +84,7 @@ Phase 0（Repository Bootstrap）与 Phase 1（Domain + KV Cache Formula）核�
 独立验收：至少一组实测数据可重放，报告明确区分 theoretical、calibrated
 和 measured，不把经验值伪装成精确公式。
 
-## Phase 5：Multimodal and MoE
+## 后续：Multimodal and MoE（未开始）
 
 交付内容：
 
@@ -77,7 +95,7 @@ Phase 0（Repository Bootstrap）与 Phase 1（Domain + KV Cache Formula）核�
 独立验收：多模态 token 和 MoE 配置的增量内存影响可追溯，缺失数据时输出
 区间或 unknown。
 
-## Phase 6：Interactive Web
+## 后续：Interactive Web（未开始）
 
 交付内容：
 
@@ -93,9 +111,10 @@ Phase 0（Repository Bootstrap）与 Phase 1（Domain + KV Cache Formula）核�
 ```text
 Phase 0
   ↓
-Phase 1 ──→ Phase 2 ──→ Phase 3 ──→ Phase 4
-                                  └──→ Phase 5 ──→ Phase 6
+Phase 1 ──→ Phase 2 ──→ Phase 3 ──→ Phase 4 (Weight Engine)
+                                  └──→ 后续 Runtime Calibration
+                                      └──→ 后续 Multimodal/MoE
+                                          └──→ 后续 Interactive Web
 ```
 
-下一阶段建议从 Phase 1 开始：先冻结 domain 数据语义和可审查公式，再接入
-任何外部模型或硬件数据。
+下一阶段建议在 Phase 4 完成后再单独规划 Model Resolver；本次交付不进入该阶段。

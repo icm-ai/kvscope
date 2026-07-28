@@ -7,6 +7,11 @@ from kvscope.calculators.kv_cache import (
     calculate_kv_cache,
     estimate_kv_cache,
 )
+from kvscope.calculators.weights import (
+    WeightEstimationMethod,
+    WeightMemoryEstimate,
+    estimate_weight_memory,
+)
 
 __all__ = [
     "AttentionMode",
@@ -14,4 +19,7 @@ __all__ = [
     "KVCacheFormulaInputs",
     "calculate_kv_cache",
     "estimate_kv_cache",
+    "WeightEstimationMethod",
+    "WeightMemoryEstimate",
+    "estimate_weight_memory",
 ]
