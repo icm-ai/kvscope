@@ -28,7 +28,8 @@ class KVCacheFormulaInputs:
     tokens are explicit reservations added to it. ``block_size`` is a backend
     allocation unit; ``None`` means that no token-block alignment is applied.
     ``active_sequences_source`` traces whether batch_size or max_num_seqs
-    determined the sequence count.
+    determined the sequence count. ``prefix_shared`` indicates whether prefix
+    tokens are shared across all active sequences in memory (e.g. RadixAttention).
     """
 
     num_hidden_layers: int
@@ -43,6 +44,7 @@ class KVCacheFormulaInputs:
     bytes_per_element: int
     block_size: int | None
     active_sequences_source: str = "equal"
+    prefix_shared: bool = False
 
     @property
     def effective_tokens(self) -> int:
@@ -176,12 +178,37 @@ def calculate_kv_cache(inputs: KVCacheFormulaInputs) -> KVCacheEstimate:
         * inputs.head_dim
         * inputs.bytes_per_element
     )
-    raw_bytes = (
-        bytes_per_token * inputs.effective_tokens * inputs.active_sequences
-    )
-    allocated_bytes = (
-        bytes_per_token * inputs.allocated_tokens * inputs.active_sequences
-    )
+
+    if inputs.prefix_shared:
+        unshared_tokens = inputs.context_tokens + inputs.multimodal_tokens
+        if inputs.block_size is None:
+            unshared_allocated_tokens = unshared_tokens
+            prefix_allocated_tokens = inputs.prefix_tokens
+        else:
+            bs = inputs.block_size
+            unshared_allocated_tokens = (
+                ((unshared_tokens + bs - 1) // bs) * bs if unshared_tokens > 0 else 0
+            )
+            prefix_allocated_tokens = (
+                ((inputs.prefix_tokens + bs - 1) // bs) * bs
+                if inputs.prefix_tokens > 0
+                else 0
+            )
+
+        raw_bytes = bytes_per_token * (
+            unshared_tokens * inputs.active_sequences + inputs.prefix_tokens
+        )
+        allocated_bytes = bytes_per_token * (
+            unshared_allocated_tokens * inputs.active_sequences
+            + prefix_allocated_tokens
+        )
+    else:
+        raw_bytes = (
+            bytes_per_token * inputs.effective_tokens * inputs.active_sequences
+        )
+        allocated_bytes = (
+            bytes_per_token * inputs.allocated_tokens * inputs.active_sequences
+        )
 
     return KVCacheEstimate(
         formula_inputs=inputs,
@@ -191,6 +218,7 @@ def calculate_kv_cache(inputs: KVCacheFormulaInputs) -> KVCacheEstimate:
         bytes_per_token=bytes_per_token,
         bytes_per_sequence=bytes_per_token * inputs.effective_tokens,
     )
+
 
 
 def estimate_kv_cache(

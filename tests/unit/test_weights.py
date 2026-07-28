@@ -351,3 +351,18 @@ def test_conflicting_precision_and_count_inputs_are_rejected() -> None:
             dtype=WeightDType.FP16,
             artifact=WeightArtifactSummary(payload_bytes=100),
         )
+
+
+def test_group_size_larger_than_parameter_count_rounds_to_one_group() -> None:
+    result = estimate_weight_memory(
+        50,
+        dtype=WeightDType.INT4,
+        group_size=128,
+        scale_bytes_per_group=2,
+        zero_point_bytes_per_group=1,
+    )
+    assert result.scale_overhead_bytes == 2  # 1 group * 2 bytes
+    assert result.zero_point_overhead_bytes == 1  # 1 group * 1 byte
+    assert result.quantized_payload_bytes == 25  # ceil(50 * 4 / 8)
+    assert result.total_bytes == 28
+

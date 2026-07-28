@@ -3,7 +3,8 @@
 ## 项目范围
 
 KVScope 是一个面向 LLM 推理前内存估算、KV Cache 分析和部署可行性解释
-的 Python 库与 CLI。当前仓库已完成 Phase 0，并正在交付 Phase 1（Domain 与 KV Cache 估算引擎）。
+的 Python 库与 CLI。当前仓库已完成 Phase 0、Phase 1（Domain 与 KV Cache 估算引擎）及 Phase 4（Weight Engine）。
+
 
 当前不实现：
 

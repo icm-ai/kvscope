@@ -204,6 +204,71 @@ def test_fp8_uses_half_the_fp16_bytes() -> None:
     assert fp16.allocated_bytes == 2 * fp8.allocated_bytes
 
 
+def test_zero_context_with_positive_prefix_is_valid() -> None:
+    result = calculate_kv_cache(
+        KVCacheFormulaInputs(
+            num_hidden_layers=2,
+            num_attention_heads=4,
+            num_key_value_heads=2,
+            head_dim=8,
+            context_tokens=0,
+            prefix_tokens=100,
+            multimodal_tokens=0,
+            active_sequences=1,
+            kv_dtype=KVDType.FP16,
+            bytes_per_element=2,
+            block_size=16,
+        )
+    )
+    assert result.effective_tokens == 100
+    assert result.allocated_tokens == 112  # ceil(100/16)*16
+    assert result.raw_bytes == 128 * 100
+
+
+def test_prefix_shared_calculates_prefix_memory_once() -> None:
+    # 2 layers, 2 kv_heads, 8 head_dim, fp16 -> 128 bytes/token
+    # context=10, prefix=100, active_sequences=4
+    # unshared: context=10 * 4 seqs = 40 tokens
+    # shared: prefix=100 * 1 = 100 tokens
+    # total raw: 140 * 128 = 17920 bytes
+    shared_result = calculate_kv_cache(
+        KVCacheFormulaInputs(
+            num_hidden_layers=2,
+            num_attention_heads=4,
+            num_key_value_heads=2,
+            head_dim=8,
+            context_tokens=10,
+            prefix_tokens=100,
+            multimodal_tokens=0,
+            active_sequences=4,
+            kv_dtype=KVDType.FP16,
+            bytes_per_element=2,
+            block_size=None,
+            prefix_shared=True,
+        )
+    )
+    unshared_result = calculate_kv_cache(
+        KVCacheFormulaInputs(
+            num_hidden_layers=2,
+            num_attention_heads=4,
+            num_key_value_heads=2,
+            head_dim=8,
+            context_tokens=10,
+            prefix_tokens=100,
+            multimodal_tokens=0,
+            active_sequences=4,
+            kv_dtype=KVDType.FP16,
+            bytes_per_element=2,
+            block_size=None,
+            prefix_shared=False,
+        )
+    )
+    assert shared_result.raw_bytes == 128 * (10 * 4 + 100)
+    assert unshared_result.raw_bytes == 128 * (110 * 4)
+    assert shared_result.raw_bytes < unshared_result.raw_bytes
+
+
+
 @pytest.mark.parametrize(
     "inputs",
     [

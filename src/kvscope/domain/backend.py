@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from pydantic import Field, StrictFloat, StrictInt, StrictStr
+from pydantic import Field, StrictFloat, StrictInt, StrictStr, model_validator
 
 from kvscope.domain.base import DomainModel
 from kvscope.domain.dtypes import KVDType
@@ -29,3 +29,13 @@ class BackendSpec(DomainModel):
     supports_cpu_offload: bool
     confidence: Confidence
     evidence_ids: list[StrictStr] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_ratios(self) -> "BackendSpec":
+        """Ensure cumulative memory overhead ratios do not exceed 100%."""
+        if self.workspace_ratio + self.allocator_margin_ratio > 1.0:
+            raise ValueError(
+                "workspace_ratio + allocator_margin_ratio must not exceed 1.0"
+            )
+        return self
+

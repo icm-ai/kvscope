@@ -149,6 +149,50 @@ def test_feasibility_rejects_inconsistent_headroom() -> None:
         )
 
 
+def test_model_spec_rejects_inconsistent_heads() -> None:
+    payload = model().model_dump()
+    payload["num_key_value_heads"] = 64  # Exceeds num_attention_heads (32)
+    with pytest.raises(ValidationError, match="must not exceed"):
+        ModelSpec.model_validate(payload)
+
+
+
+def test_model_spec_rejects_inconsistent_moe_and_parameter_counts() -> None:
+    payload = model().model_dump()
+    payload["num_experts"] = 4
+    payload["num_experts_per_tok"] = 8  # Exceeds num_experts
+    with pytest.raises(ValidationError, match="num_experts_per_tok must not exceed"):
+        ModelSpec.model_validate(payload)
+
+    payload = model().model_dump()
+    payload["parameter_count"] = 1_000_000
+    payload["active_parameter_count"] = 2_000_000  # Exceeds parameter_count
+    with pytest.raises(ValidationError, match="active_parameter_count must not exceed"):
+        ModelSpec.model_validate(payload)
+
+
+def test_backend_spec_rejects_excessive_cumulative_ratio() -> None:
+    payload = backend().model_dump()
+    payload["workspace_ratio"] = 0.6
+    payload["allocator_margin_ratio"] = 0.5  # Sum is 1.1 > 1.0
+    with pytest.raises(ValidationError, match="must not exceed 1.0"):
+        BackendSpec.model_validate(payload)
+
+
+def test_inference_config_supports_explicit_active_sequences_override() -> None:
+    conf = InferenceConfig(
+        weight_dtype=WeightDType.FP16,
+        kv_dtype=KVDType.FP16,
+        context_length=1000,
+        batch_size=4,
+        max_num_seqs=256,
+        active_sequences_override=8,
+    )
+    assert conf.active_sequences == 8
+    assert conf.active_sequences_source == "explicit"
+
+
+
 def test_estimate_component_rejects_inverted_or_out_of_range_bounds() -> None:
     with pytest.raises(ValidationError, match="upper_bound_bytes"):
         EstimateComponent(
