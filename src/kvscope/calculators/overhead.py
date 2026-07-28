@@ -1,1 +1,1 @@
-"""Runtime overhead calculation is deferred to a later phase."""
+"""Backend runtime overhead formulas (planned for Phase 1)."""

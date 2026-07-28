@@ -266,3 +266,65 @@ def test_all_domain_enums_have_stable_wire_values() -> None:
         "high",
         "unknown",
     }
+
+
+def test_domain_model_validates_raw_dicts_with_string_enums() -> None:
+    hw_dict = {
+        "hardware_id": "test-device",
+        "vendor": "test-vendor",
+        "device_family": "gpu",
+        "name": "Test Device",
+        "memory_topology": "discrete",
+        "total_memory_bytes": 16 * 1024**3,
+        "default_system_reserve_bytes": 512 * 1024**2,
+    }
+    parsed_hw = HardwareSpec.model_validate(hw_dict)
+    assert parsed_hw.memory_topology is MemoryTopology.DISCRETE
+
+    backend_dict = {
+        "backend_id": "vllm",
+        "base_overhead_bytes": 0,
+        "overhead_per_billion_parameters_bytes": 0,
+        "graph_capture_reserve_bytes": 0,
+        "workspace_ratio": 0.0,
+        "allocator_margin_ratio": 0.0,
+        "supports_kv_dtypes": ["fp16", "int8"],
+        "supports_cpu_offload": False,
+        "confidence": "exact",
+    }
+    parsed_backend = BackendSpec.model_validate(backend_dict)
+    assert parsed_backend.supports_kv_dtypes == [KVDType.FP16, KVDType.INT8]
+    assert parsed_backend.confidence is Confidence.EXACT
+
+
+def test_inference_config_traces_active_sequences_source() -> None:
+    cfg1 = InferenceConfig(
+        weight_dtype=WeightDType.FP16,
+        kv_dtype=KVDType.FP16,
+        context_length=100,
+        batch_size=8,
+        max_num_seqs=1,
+    )
+    assert cfg1.active_sequences == 8
+    assert cfg1.active_sequences_source == "batch_size"
+
+    cfg2 = InferenceConfig(
+        weight_dtype=WeightDType.FP16,
+        kv_dtype=KVDType.FP16,
+        context_length=100,
+        batch_size=1,
+        max_num_seqs=16,
+    )
+    assert cfg2.active_sequences == 16
+    assert cfg2.active_sequences_source == "max_num_seqs"
+
+    cfg3 = InferenceConfig(
+        weight_dtype=WeightDType.FP16,
+        kv_dtype=KVDType.FP16,
+        context_length=100,
+        batch_size=4,
+        max_num_seqs=4,
+    )
+    assert cfg3.active_sequences == 4
+    assert cfg3.active_sequences_source == "equal"
+

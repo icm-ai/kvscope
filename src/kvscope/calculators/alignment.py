@@ -1,1 +1,1 @@
-"""Allocation alignment calculation is deferred to a later phase."""
+"""Token and memory block alignment formulas (planned for Phase 1/Phase 3)."""

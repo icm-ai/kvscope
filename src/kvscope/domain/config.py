@@ -32,3 +32,13 @@ class InferenceConfig(DomainModel):
     def active_sequences(self) -> int:
         """Return the v0.1 active-sequence interpretation for KV budgeting."""
         return max(self.batch_size, self.max_num_seqs)
+
+    @property
+    def active_sequences_source(self) -> str:
+        """Trace whether batch_size or max_num_seqs determined active_sequences."""
+        if self.batch_size > self.max_num_seqs:
+            return "batch_size"
+        if self.max_num_seqs > self.batch_size:
+            return "max_num_seqs"
+        return "equal"
+

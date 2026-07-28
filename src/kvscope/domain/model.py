@@ -41,8 +41,4 @@ class ModelSpec(DomainModel):
             raise ValueError(
                 "num_attention_heads must be divisible by num_key_value_heads"
             )
-        if self.hidden_size != self.num_attention_heads * self.head_dim:
-            raise ValueError(
-                "hidden_size must equal num_attention_heads * head_dim"
-            )
         return self

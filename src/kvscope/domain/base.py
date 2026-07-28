@@ -6,4 +6,4 @@ from pydantic import BaseModel, ConfigDict
 class DomainModel(BaseModel):
     """Base class for strict, immutable boundary models."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+    model_config = ConfigDict(extra="forbid", frozen=True)

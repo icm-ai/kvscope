@@ -1,7 +1,7 @@
 # KVScope v0.1 Implementation Plan
 
-本文档把产品和架构文档中的 v0.1 拆分为可独立验收的阶段。当前只完成
-Phase 0；后续阶段不应在本次仓库初始化中提前实现。
+本文档把产品和架构文档中的 v0.1 拆分为可独立验收的阶段。当前阶段：
+Phase 0（Repository Bootstrap）与 Phase 1（Domain + KV Cache Formula）核心部分已完成。
 
 ## Phase 0：Repository Bootstrap — 已完成
 
@@ -12,10 +12,9 @@ Phase 0；后续阶段不应在本次仓库初始化中提前实现。
 - `kvscope --version` 和 `kvscope --help` 可运行；
 - pytest、pytest-cov、mypy、ruff、pre-commit 和 GitHub Actions 已配置；
 - 单元、集成、golden、fixtures 测试目录存在；
-- README、贡献指南、安全政策和 Apache-2.0 许可证齐全；
-- 不包含正式内存估算逻辑，不包含 InferPilot 功能。
+- README、贡献指南、安全政策和 Apache-2.0 许可证齐全。
 
-## Phase 1：Domain + Formula
+## Phase 1：Domain + Formula — 实施中 / 部分已完成
 
 交付内容：
 

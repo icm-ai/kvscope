@@ -1,1 +1,1 @@
-"""Weight memory calculation is deferred to a later phase."""
+"""Model weight memory calculation formulas (planned for Phase 1)."""

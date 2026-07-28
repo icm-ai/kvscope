@@ -13,13 +13,13 @@ class ModelResolutionError(KVScopeError):
     """Raised when a model source cannot be resolved."""
 
 
-class InvalidModelConfigError(KVScopeError):
+class InvalidModelConfigError(KVScopeError, ValueError):
     """Raised when model configuration data is invalid."""
 
 
-class UnsupportedArchitectureError(KVScopeError):
+class UnsupportedArchitectureError(KVScopeError, ValueError):
     """Raised when a model architecture is not supported."""
 
 
-class ProfileValidationError(KVScopeError):
+class ProfileValidationError(KVScopeError, ValueError):
     """Raised when a hardware or backend profile is invalid."""

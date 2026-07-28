@@ -1,1 +1,1 @@
-"""System reserve calculation is deferred to a later phase."""
+"""System and device memory reserve formulas (planned for Phase 1)."""

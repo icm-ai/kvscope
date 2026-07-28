@@ -6,7 +6,10 @@ from enum import StrEnum
 from kvscope.domain.backend import BackendSpec
 from kvscope.domain.config import InferenceConfig
 from kvscope.domain.dtypes import KVDType
+from kvscope.domain.enums import Confidence
+from kvscope.domain.estimate import EstimateComponent
 from kvscope.domain.model import ModelSpec
+from kvscope.errors import InvalidModelConfigError, ProfileValidationError
 
 
 class AttentionMode(StrEnum):
@@ -24,6 +27,8 @@ class KVCacheFormulaInputs:
     ``context_tokens`` is the requested text context. Prefix and multimodal
     tokens are explicit reservations added to it. ``block_size`` is a backend
     allocation unit; ``None`` means that no token-block alignment is applied.
+    ``active_sequences_source`` traces whether batch_size or max_num_seqs
+    determined the sequence count.
     """
 
     num_hidden_layers: int
@@ -37,6 +42,7 @@ class KVCacheFormulaInputs:
     kv_dtype: KVDType
     bytes_per_element: int
     block_size: int | None
+    active_sequences_source: str = "equal"
 
     @property
     def effective_tokens(self) -> int:
@@ -90,11 +96,25 @@ class KVCacheEstimate:
         """Return the attention layout used by the estimate."""
         return self.formula_inputs.attention_mode
 
+    def to_estimate_component(self) -> EstimateComponent:
+        """Convert the result to a domain EstimateComponent for reports."""
+        formula_str = (
+            "2 * layers * kv_heads * head_dim * bytes_per_elem * tokens * seqs"
+        )
+        return EstimateComponent(
+            name="kv_cache",
+            bytes=self.allocated_bytes,
+            lower_bound_bytes=self.raw_bytes,
+            upper_bound_bytes=self.allocated_bytes,
+            confidence=Confidence.EXACT,
+            formula=formula_str,
+        )
+
 
 def _validate_formula_inputs(inputs: KVCacheFormulaInputs) -> None:
     """Reject invalid formula operands before performing arithmetic."""
     if not isinstance(inputs.kv_dtype, KVDType):
-        raise ValueError("kv_dtype must be a KVDType")
+        raise InvalidModelConfigError("kv_dtype must be a KVDType")
 
     positive_fields = (
         "num_hidden_layers",
@@ -107,9 +127,9 @@ def _validate_formula_inputs(inputs: KVCacheFormulaInputs) -> None:
     for field_name in positive_fields:
         value = getattr(inputs, field_name)
         if type(value) is not int or value <= 0:
-            raise ValueError(f"{field_name} must be a positive integer")
+            raise InvalidModelConfigError(f"{field_name} must be a positive integer")
     if inputs.bytes_per_element != inputs.kv_dtype.bytes_per_element:
-        raise ValueError("bytes_per_element does not match kv_dtype")
+        raise InvalidModelConfigError("bytes_per_element does not match kv_dtype")
 
     nonnegative_fields = (
         "context_tokens",
@@ -119,20 +139,24 @@ def _validate_formula_inputs(inputs: KVCacheFormulaInputs) -> None:
     for field_name in nonnegative_fields:
         value = getattr(inputs, field_name)
         if type(value) is not int or value < 0:
-            raise ValueError(f"{field_name} must be a non-negative integer")
+            raise InvalidModelConfigError(
+                f"{field_name} must be a non-negative integer"
+            )
 
     if inputs.effective_tokens <= 0:
-        raise ValueError("at least one token must be reserved")
+        raise InvalidModelConfigError("at least one token must be reserved")
     if inputs.num_key_value_heads > inputs.num_attention_heads:
-        raise ValueError("num_key_value_heads must not exceed num_attention_heads")
+        raise InvalidModelConfigError(
+            "num_key_value_heads must not exceed num_attention_heads"
+        )
     if inputs.num_attention_heads % inputs.num_key_value_heads != 0:
-        raise ValueError(
+        raise InvalidModelConfigError(
             "num_attention_heads must be divisible by num_key_value_heads"
         )
     if inputs.block_size is not None and (
         type(inputs.block_size) is not int or inputs.block_size <= 0
     ):
-        raise ValueError("block_size must be a positive integer or None")
+        raise InvalidModelConfigError("block_size must be a positive integer or None")
 
 
 def calculate_kv_cache(inputs: KVCacheFormulaInputs) -> KVCacheEstimate:
@@ -176,7 +200,7 @@ def estimate_kv_cache(
 ) -> KVCacheEstimate:
     """Estimate KV Cache bytes for a model, workload, and backend profile."""
     if config.kv_dtype not in backend.supports_kv_dtypes:
-        raise ValueError(
+        raise ProfileValidationError(
             f"backend {backend.backend_id!r} does not support KV dtype "
             f"{config.kv_dtype.value!r}"
         )
@@ -194,5 +218,7 @@ def estimate_kv_cache(
             kv_dtype=config.kv_dtype,
             bytes_per_element=config.kv_dtype.bytes_per_element,
             block_size=backend.kv_block_size,
+            active_sequences_source=config.active_sequences_source,
         )
     )
+

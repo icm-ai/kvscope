@@ -3,13 +3,13 @@
 ## 项目范围
 
 KVScope 是一个面向 LLM 推理前内存估算、KV Cache 分析和部署可行性解释
-的 Python 库与 CLI。当前仓库只完成 Phase 0：Repository Bootstrap。
+的 Python 库与 CLI。当前仓库已完成 Phase 0，并正在交付 Phase 1（Domain 与 KV Cache 估算引擎）。
 
-Phase 0 不实现：
+当前不实现：
 
-- 正式的权重、KV Cache、运行时开销或可行性计算；
-- InferPilot 的任何功能或集成；
+- InferPilot 的完整集成；
 - Web UI、模型下载、推理服务、benchmark 和自动调优。
+
 
 ## 编码规则
 

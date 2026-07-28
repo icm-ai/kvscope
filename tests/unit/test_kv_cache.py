@@ -79,6 +79,9 @@ def test_formula_result_contains_inputs_and_integer_byte_breakdown() -> None:
     assert result.formula_inputs.active_sequences == 2
     assert result.formula_inputs.effective_tokens == 13
     assert result.formula_inputs.allocated_tokens == 16
+    assert result.effective_tokens == 13
+    assert result.allocated_tokens == 16
+    assert result.attention_mode.value == "gqa"
     assert result.raw_bytes == 3328
     assert result.allocated_bytes == 4096
     assert result.alignment_waste_bytes == 768
@@ -94,6 +97,12 @@ def test_formula_result_contains_inputs_and_integer_byte_breakdown() -> None:
             result.bytes_per_sequence,
         )
     )
+
+    component = result.to_estimate_component()
+    assert component.name == "kv_cache"
+    assert component.bytes == 4096
+    assert component.lower_bound_bytes == 3328
+    assert component.upper_bound_bytes == 4096
 
 
 @pytest.mark.parametrize(
@@ -114,8 +123,8 @@ def test_attention_layouts_use_kv_head_count(
 
 
 @given(
-    context_a=st.integers(min_value=1, max_value=256),
-    context_delta=st.integers(min_value=0, max_value=256),
+    context_a=st.integers(min_value=1, max_value=2048),
+    context_delta=st.integers(min_value=0, max_value=2048),
 )
 def test_context_tokens_are_monotonic(
     context_a: int, context_delta: int
@@ -132,8 +141,8 @@ def test_context_tokens_are_monotonic(
 
 
 @given(
-    active_a=st.integers(min_value=1, max_value=32),
-    active_delta=st.integers(min_value=0, max_value=32),
+    active_a=st.integers(min_value=1, max_value=128),
+    active_delta=st.integers(min_value=0, max_value=128),
 )
 def test_active_sequences_are_monotonic(
     active_a: int, active_delta: int
@@ -152,9 +161,9 @@ def test_active_sequences_are_monotonic(
 
 
 @given(
-    context=st.integers(min_value=1, max_value=100),
-    prefix=st.integers(min_value=0, max_value=100),
-    multimodal=st.integers(min_value=0, max_value=100),
+    context=st.integers(min_value=1, max_value=1000),
+    prefix=st.integers(min_value=0, max_value=1000),
+    multimodal=st.integers(min_value=0, max_value=1000),
     block_size=st.integers(min_value=1, max_value=64),
 )
 def test_block_alignment_is_ceil_and_waste_is_nonnegative(
@@ -173,6 +182,14 @@ def test_block_alignment_is_ceil_and_waste_is_nonnegative(
     assert result.alignment_waste_bytes == (
         result.allocated_bytes - result.raw_bytes
     )
+
+
+def test_unaligned_block_size_none_returns_exact_raw_bytes() -> None:
+    result = estimate_kv_cache(
+        model(), config(context=100), backend(block_size=None)
+    )
+    assert result.allocated_bytes == result.raw_bytes
+    assert result.alignment_waste_bytes == 0
 
 
 def test_fp8_uses_half_the_fp16_bytes() -> None:
@@ -229,6 +246,58 @@ def test_fp8_uses_half_the_fp16_bytes() -> None:
             bytes_per_element=2,
             block_size=0,
         ),
+        KVCacheFormulaInputs(
+            num_hidden_layers=1,
+            num_attention_heads=4,
+            num_key_value_heads=2,
+            head_dim=8,
+            context_tokens=1,
+            prefix_tokens=0,
+            multimodal_tokens=0,
+            active_sequences=1,
+            kv_dtype=KVDType.FP16,
+            bytes_per_element=4,  # Mismatch with FP16 (2 bytes)
+            block_size=None,
+        ),
+        KVCacheFormulaInputs(
+            num_hidden_layers=1,
+            num_attention_heads=2,
+            num_key_value_heads=4,  # kv_heads > attention_heads
+            head_dim=8,
+            context_tokens=1,
+            prefix_tokens=0,
+            multimodal_tokens=0,
+            active_sequences=1,
+            kv_dtype=KVDType.FP16,
+            bytes_per_element=2,
+            block_size=None,
+        ),
+        KVCacheFormulaInputs(
+            num_hidden_layers=1,
+            num_attention_heads=4,
+            num_key_value_heads=2,
+            head_dim=8,
+            context_tokens=0,
+            prefix_tokens=0,
+            multimodal_tokens=0,  # Zero total tokens
+            active_sequences=1,
+            kv_dtype=KVDType.FP16,
+            bytes_per_element=2,
+            block_size=None,
+        ),
+        KVCacheFormulaInputs(
+            num_hidden_layers=1,
+            num_attention_heads=4,
+            num_key_value_heads=2,
+            head_dim=8,
+            context_tokens=1,
+            prefix_tokens=0,
+            multimodal_tokens=0,
+            active_sequences=1,
+            kv_dtype="invalid_type",  # Not a KVDType enum
+            bytes_per_element=2,
+            block_size=None,
+        ),
     ],
 )
 def test_formula_rejects_illegal_parameters(
@@ -256,3 +325,4 @@ def test_engine_rejects_unsupported_kv_dtype() -> None:
         estimate_kv_cache(
             model(), config(kv_dtype=KVDType.FP8), unsupported_backend
         )
+
