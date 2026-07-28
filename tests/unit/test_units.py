@@ -42,3 +42,14 @@ def test_unit_conversion_rejects_ambiguous_input_types(value: object) -> None:
 def test_bytes_to_unit_rejects_negative_bytes(converter) -> None:
     with pytest.raises(ValueError, match="non-negative"):
         converter(-1)
+
+
+@pytest.mark.parametrize("converter", [bytes_to_mib, bytes_to_gib])
+@pytest.mark.parametrize("invalid_value", [1.5, True, "100"])
+def test_bytes_to_unit_rejects_non_integer_types(
+    converter, invalid_value: object
+) -> None:
+    with pytest.raises(TypeError, match="bytes must be an integer"):
+        converter(invalid_value)  # type: ignore[arg-type]
+
+

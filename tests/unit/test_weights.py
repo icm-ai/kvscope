@@ -9,9 +9,11 @@ from hypothesis import strategies as st
 
 from kvscope.calculators.weights import (
     WeightEstimationMethod,
+    WeightMemoryEstimate,
     estimate_weight_memory,
 )
 from kvscope.domain.dtypes import WeightDType
+from kvscope.domain.enums import Confidence
 from kvscope.domain.weight import WeightArtifactSummary
 from kvscope.errors import InvalidModelConfigError
 
@@ -365,4 +367,217 @@ def test_group_size_larger_than_parameter_count_rounds_to_one_group() -> None:
     assert result.zero_point_overhead_bytes == 1  # 1 group * 1 byte
     assert result.quantized_payload_bytes == 25  # ceil(50 * 4 / 8)
     assert result.total_bytes == 28
+
+
+def test_empty_weight_artifact_summary_raises_error() -> None:
+    msg = "artifact summary must contain at least one byte"
+    with pytest.raises(ValueError, match=msg):
+        WeightArtifactSummary(payload_bytes=0, metadata_bytes=0, alignment_bytes=0)
+
+
+def test_weight_estimate_validation_errors() -> None:
+    # Artifact invalid type
+    msg1 = "must be a WeightArtifactSummary"
+    with pytest.raises(InvalidModelConfigError, match=msg1):
+        estimate_weight_memory(artifact="invalid_artifact")  # type: ignore[arg-type]
+
+    # Non-finite float for bits
+    msg2 = "must be a finite numeric value"
+    with pytest.raises(InvalidModelConfigError, match=msg2):
+        estimate_weight_memory(100, bits_per_weight=float("nan"))
+
+    with pytest.raises(InvalidModelConfigError, match=msg2):
+        estimate_weight_memory(100, bits_per_weight="invalid_bits")
+
+    # Resolve bits invalid dtype or missing bits
+    msg3 = "must be a WeightDType"
+    with pytest.raises(InvalidModelConfigError, match=msg3):
+        estimate_weight_memory(100, dtype="not_a_dtype")  # type: ignore[arg-type]
+
+    msg4 = "must be supplied with dtype or custom bits"
+    with pytest.raises(InvalidModelConfigError, match=msg4):
+        estimate_weight_memory(100)
+
+    # Unquantized dtype invalid type
+    with pytest.raises(InvalidModelConfigError, match=msg3):
+        estimate_weight_memory(
+            100, dtype=WeightDType.FP16, unquantized_dtype="invalid"  # type: ignore[arg-type]
+        )
+
+    # Group mode with invalid dtype
+    with pytest.raises(InvalidModelConfigError, match=msg3):
+        estimate_weight_memory(100, group_size=32, dtype="not_a_dtype")  # type: ignore[arg-type]
+
+    # Group mode with conflicting bits_per_weight and quantization_bits
+    msg5 = "conflicts with bits_per_weight"
+    with pytest.raises(InvalidModelConfigError, match=msg5):
+        estimate_weight_memory(
+            100, group_size=32, bits_per_weight=4, quantization_bits=8
+        )
+
+    # Group mode missing group_size
+    msg6 = "must be supplied in group quantization mode"
+    with pytest.raises(InvalidModelConfigError, match=msg6):
+        estimate_weight_memory(100, quantization_bits=4, scale_bytes_per_group=2)
+
+    # Quantized parameter count exceeds total parameter count
+    msg7 = "must not exceed parameter_count"
+    with pytest.raises(InvalidModelConfigError, match=msg7):
+        estimate_weight_memory(
+            100,
+            quantization_bits=4,
+            group_size=16,
+            quantized_parameter_count=150,
+        )
+
+    # Unquantized parameters without unquantized_dtype
+    msg9 = "must be supplied when unquantized parameters are present"
+    with pytest.raises(InvalidModelConfigError, match=msg9):
+        estimate_weight_memory(
+            100,
+            quantization_bits=4,
+            group_size=16,
+            unquantized_parameter_count=10,
+        )
+
+    # Float bits and matching bits_per_weight & quantization_bits
+    res = estimate_weight_memory(
+        100, bits_per_weight=4.0, quantization_bits=4.0, group_size=16
+    )
+    assert res.total_bytes > 0
+
+    # Matching quantized_parameter_count and unquantized_parameter_count
+    # covering total_parameters
+    res_covered = estimate_weight_memory(
+        100,
+        quantization_bits=4,
+        group_size=16,
+        quantized_parameter_count=70,
+        unquantized_parameter_count=30,
+        unquantized_dtype=WeightDType.FP16,
+    )
+    assert res_covered.total_bytes > 0
+
+    res_fraction = estimate_weight_memory(
+        100,
+        quantization_bits=4,
+        group_size=16,
+        quantized_parameter_count=70,
+        unquantized_fraction="0.3",
+        unquantized_dtype=WeightDType.FP16,
+    )
+    assert res_fraction.total_bytes > 0
+
+
+
+
+
+def test_weight_memory_estimate_model_validators() -> None:
+    msg1 = "must be a non-negative integer"
+    with pytest.raises(ValueError, match=msg1):
+        WeightMemoryEstimate(
+            quantized_payload_bytes=-1,
+            unquantized_payload_bytes=0,
+            scale_overhead_bytes=0,
+            zero_point_overhead_bytes=0,
+            metadata_bytes=0,
+            alignment_overhead_bytes=0,
+            total_bytes=0,
+            effective_bits_per_weight=Fraction(16, 1),
+            estimation_method=WeightEstimationMethod.PARAMETER_COUNT,
+            confidence=Confidence.EXACT,
+            assumptions=(),
+            warnings=(),
+        )
+
+    msg2 = "total_bytes must equal all byte components combined"
+    with pytest.raises(ValueError, match=msg2):
+        WeightMemoryEstimate(
+            quantized_payload_bytes=100,
+            unquantized_payload_bytes=0,
+            scale_overhead_bytes=0,
+            zero_point_overhead_bytes=0,
+            metadata_bytes=0,
+            alignment_overhead_bytes=0,
+            total_bytes=999,
+            effective_bits_per_weight=Fraction(16, 1),
+            estimation_method=WeightEstimationMethod.PARAMETER_COUNT,
+            confidence=Confidence.EXACT,
+            assumptions=(),
+            warnings=(),
+        )
+
+    msg3 = "effective_bits_per_weight must be positive or None"
+    with pytest.raises(ValueError, match=msg3):
+        WeightMemoryEstimate(
+            quantized_payload_bytes=100,
+            unquantized_payload_bytes=0,
+            scale_overhead_bytes=0,
+            zero_point_overhead_bytes=0,
+            metadata_bytes=0,
+            alignment_overhead_bytes=0,
+            total_bytes=100,
+            effective_bits_per_weight=Fraction(0, 1),
+            estimation_method=WeightEstimationMethod.PARAMETER_COUNT,
+            confidence=Confidence.EXACT,
+            assumptions=(),
+            warnings=(),
+        )
+
+    msg4 = "artifact_storage_bytes must be a non-negative integer"
+    with pytest.raises(ValueError, match=msg4):
+        WeightMemoryEstimate(
+            quantized_payload_bytes=100,
+            unquantized_payload_bytes=0,
+            scale_overhead_bytes=0,
+            zero_point_overhead_bytes=0,
+            metadata_bytes=0,
+            alignment_overhead_bytes=0,
+            total_bytes=100,
+            effective_bits_per_weight=Fraction(16, 1),
+            estimation_method=WeightEstimationMethod.PARAMETER_COUNT,
+            confidence=Confidence.EXACT,
+            assumptions=(),
+            warnings=(),
+            artifact_storage_bytes=-1,
+        )
+
+    msg5 = "estimated_resident_weight_bytes must be a non-negative integer"
+    with pytest.raises(ValueError, match=msg5):
+        WeightMemoryEstimate(
+            quantized_payload_bytes=100,
+            unquantized_payload_bytes=0,
+            scale_overhead_bytes=0,
+            zero_point_overhead_bytes=0,
+            metadata_bytes=0,
+            alignment_overhead_bytes=0,
+            total_bytes=100,
+            effective_bits_per_weight=Fraction(16, 1),
+            estimation_method=WeightEstimationMethod.PARAMETER_COUNT,
+            confidence=Confidence.EXACT,
+            assumptions=(),
+            warnings=(),
+            estimated_resident_weight_bytes=-1,
+        )
+
+    msg6 = "estimated_resident_weight_bytes must equal total_bytes when set"
+    with pytest.raises(ValueError, match=msg6):
+        WeightMemoryEstimate(
+            quantized_payload_bytes=100,
+            unquantized_payload_bytes=0,
+            scale_overhead_bytes=0,
+            zero_point_overhead_bytes=0,
+            metadata_bytes=0,
+            alignment_overhead_bytes=0,
+            total_bytes=100,
+            effective_bits_per_weight=Fraction(16, 1),
+            estimation_method=WeightEstimationMethod.PARAMETER_COUNT,
+            confidence=Confidence.EXACT,
+            assumptions=(),
+            warnings=(),
+            estimated_resident_weight_bytes=200,
+        )
+
+
+
 

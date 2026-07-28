@@ -5,6 +5,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from kvscope.calculators.kv_cache import (
+    AttentionMode,
     KVCacheFormulaInputs,
     calculate_kv_cache,
     estimate_kv_cache,
@@ -390,4 +391,67 @@ def test_engine_rejects_unsupported_kv_dtype() -> None:
         estimate_kv_cache(
             model(), config(kv_dtype=KVDType.FP8), unsupported_backend
         )
+
+
+def test_kv_cache_estimate_properties_and_to_estimate_component() -> None:
+    inputs = KVCacheFormulaInputs(
+        num_hidden_layers=2,
+        num_attention_heads=8,
+        num_key_value_heads=4,
+        head_dim=64,
+        context_tokens=100,
+        prefix_tokens=0,
+        multimodal_tokens=0,
+        active_sequences=1,
+        kv_dtype=KVDType.FP16,
+        bytes_per_element=2,
+        block_size=16,
+    )
+    result = calculate_kv_cache(inputs)
+    assert result.effective_tokens == 100
+    assert result.allocated_tokens == 112
+    assert result.attention_mode == AttentionMode.GQA
+    component = result.to_estimate_component()
+    assert component.name == "kv_cache"
+    assert component.bytes == result.allocated_bytes
+
+
+def test_prefix_shared_with_block_size_calculation() -> None:
+    inputs = KVCacheFormulaInputs(
+        num_hidden_layers=1,
+        num_attention_heads=4,
+        num_key_value_heads=4,
+        head_dim=32,
+        context_tokens=10,
+        prefix_tokens=20,
+        multimodal_tokens=5,
+        prefix_shared=True,
+        active_sequences=2,
+        kv_dtype=KVDType.FP16,
+        bytes_per_element=2,
+        block_size=16,
+    )
+    result = calculate_kv_cache(inputs)
+    assert result.allocated_bytes > 0
+
+
+def test_formula_rejects_negative_token_counts() -> None:
+    inputs = KVCacheFormulaInputs(
+        num_hidden_layers=1,
+        num_attention_heads=4,
+        num_key_value_heads=4,
+        head_dim=32,
+        context_tokens=-5,
+        prefix_tokens=0,
+        multimodal_tokens=0,
+        active_sequences=1,
+        kv_dtype=KVDType.FP16,
+        bytes_per_element=2,
+        block_size=None,
+    )
+    msg = "context_tokens must be a non-negative integer"
+    with pytest.raises(ValueError, match=msg):
+        calculate_kv_cache(inputs)
+
+
 
