@@ -15,6 +15,7 @@ from kvscope.domain.evidence import Evidence
 from kvscope.domain.feasibility import FeasibilityResult
 from kvscope.domain.hardware import HardwareSpec
 from kvscope.domain.model import ModelSpec
+from kvscope.domain.model_source import ModelSource, ResolvedModel, ResolverAttempt
 from kvscope.domain.recommendation import Recommendation
 from kvscope.domain.report import AnalysisReport
 from kvscope.domain.units import (
@@ -44,6 +45,9 @@ __all__ = [
     "MemoryEstimate",
     "MemoryTopology",
     "ModelSpec",
+    "ModelSource",
+    "ResolvedModel",
+    "ResolverAttempt",
     "Recommendation",
     "RiskLevel",
     "WeightDType",

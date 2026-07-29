@@ -23,6 +23,7 @@ classifiers = [
 dependencies = ["pydantic>=2,<3"]
 
 [project.optional-dependencies]
+huggingface = ["huggingface_hub>=0.23"]
 dev = [
     "mypy>=1.11,<2",
     "pre-commit>=3.7,<5",

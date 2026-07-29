@@ -3,12 +3,15 @@
 KVScope is a lightweight, explainable toolkit for estimating LLM inference
 memory and understanding KV Cache behavior across models and hardware.
 
-> Phase 0 is repository bootstrap. The calculation and analysis APIs are not
-> implemented yet, and estimates must not be inferred from this release.
+> Phase 5 provides static model configuration resolution. It never downloads
+> weights or executes remote model code.
 
 ## Current status
 
 The repository currently provides:
+
+- `resolve_model()` for explicit, local, Hugging Face, and registry sources;
+- offline, revision-aware metadata caching and architecture adapters;
 
 - a Python 3.11+ `src/` layout;
 - the package and CLI entry point;

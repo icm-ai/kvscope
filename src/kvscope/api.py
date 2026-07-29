@@ -18,13 +18,22 @@ from kvscope.domain.estimate import EstimateComponent, MemoryEstimate
 from kvscope.domain.feasibility import FeasibilityResult
 from kvscope.domain.hardware import HardwareSpec
 from kvscope.domain.model import ModelSpec
+from kvscope.domain.model_source import ModelSource, ResolvedModel, ResolverAttempt
 from kvscope.domain.report import AnalysisReport
 from kvscope.domain.weight import WeightArtifactSummary
 from kvscope.errors import (
     InvalidModelConfigError,
     KVScopeError,
+    ModelConfigConflictError,
+    ModelConfigParseError,
+    ModelSourceNotFoundError,
+    OfflineCacheMissError,
+    OptionalDependencyMissingError,
     ProfileValidationError,
+    RegistryValidationError,
+    UnsupportedArchitectureError,
 )
+from kvscope.resolvers.chain import resolve_model
 
 __all__ = [
     "AnalysisReport",
@@ -40,6 +49,17 @@ __all__ = [
     "KVScopeError",
     "MemoryEstimate",
     "ModelSpec",
+    "ModelSource",
+    "ResolvedModel",
+    "ResolverAttempt",
+    "ModelConfigConflictError",
+    "ModelConfigParseError",
+    "ModelSourceNotFoundError",
+    "OfflineCacheMissError",
+    "OptionalDependencyMissingError",
+    "RegistryValidationError",
+    "UnsupportedArchitectureError",
+    "resolve_model",
     "ProfileValidationError",
     "WeightArtifactSummary",
     "WeightEstimationMethod",

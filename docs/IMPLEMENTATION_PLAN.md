@@ -72,6 +72,12 @@ Web UI、InferPilot 和推理后端启动。
 区分 artifact storage bytes 与 estimated resident weight bytes，且通过 Ruff、
 mypy、pytest 和覆盖率门禁。
 
+## Phase 5：Model Resolver + Model Registry — 已完成
+
+交付内容：显式、本地 JSON、可选 Hugging Face、内置 registry resolver；LLaMA、Qwen、DeepSeek 和受控 generic decoder adapter；字段别名冲突检测；来源、revision、digest、warnings、confidence 和 attempts provenance；原子缓存与严格 offline 模式；`resolve_model` API 与 `inspect-model` CLI。
+
+本阶段不下载或加载权重，不执行远程代码，不实现 Hardware/Backend Resolver、Runtime Overhead、Feasibility、Recommendation、Benchmark、Web UI 或 InferPilot。
+
 ## 后续：Runtime Calibration（未开始）
 
 交付内容：

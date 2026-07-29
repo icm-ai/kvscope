@@ -3,12 +3,14 @@
 KVScope 是一个轻量、可解释的 LLM 推理内存与 KV Cache 分析工具，面向
 不同模型、硬件和推理配置提供可追溯的内存估算。
 
-> 当前为 Phase 0 仓库初始化阶段。正式的计算和分析 API 尚未实现，不能
-> 根据当前版本推断任何内存估算结果。
+> 当前已完成 Phase 5 模型配置解析。KVScope 不下载权重，也不执行远程模型代码。
 
 ## 当前状态
 
 仓库已经提供：
+
+- `resolve_model()`：解析显式配置、本地 JSON、Hugging Face 和内置 Registry；
+- 支持 revision、缓存、offline 模式和架构适配器；
 
 - Python 3.11+ `src/` 项目布局；
 - 可安装的 Python 包和 CLI 入口；
