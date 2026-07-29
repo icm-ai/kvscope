@@ -126,7 +126,7 @@ class ResolverChain:
                 else Confidence.HIGH
             )
         if adapter_id == "generic_decoder":
-            confidence = min(
+            confidence = max(
                 confidence,
                 Confidence.MEDIUM,
                 key=lambda item: list(Confidence).index(item),
@@ -135,9 +135,19 @@ class ResolverChain:
                 "Generic adapter was used; architecture-specific fields "
                 "may be incomplete."
             )
-        if raw.raw_config.get("vision_config") or raw.raw_config.get("visual"):
+        model_type_str = str(raw.raw_config.get("model_type", "")).lower()
+        if (
+            raw.raw_config.get("vision_config")
+            or raw.raw_config.get("visual")
+            or raw.raw_config.get("vision_tower")
+            or raw.raw_config.get("image_tower")
+            or raw.raw_config.get("multimodal")
+            or raw.raw_config.get("mm_projector_type")
+            or any(kw in model_type_str for kw in ("vl", "vision", "multimodal"))
+        ):
             warnings.append(
-                "Multimodal configuration detected; ModelSpec describes "
+                "Multimodal configuration detected; vision encoder is not included "
+                "and multimodal memory is not fully estimated. ModelSpec describes "
                 "the language decoder only."
             )
         digest = config_digest(raw.raw_config)
