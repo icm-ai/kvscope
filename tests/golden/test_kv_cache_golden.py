@@ -143,4 +143,3 @@ def test_fp32_mha_golden_case() -> None:
     # raw = 4096 * 10 * 1 = 40,960 bytes.
     assert result.raw_bytes == 40_960
     assert result.allocated_bytes == 40_960
-

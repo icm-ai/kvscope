@@ -1,0 +1,68 @@
+schema_version: "0.1"
+profile_id: llama-cpp-generic-template
+backend_id: llama_cpp
+display_name: llama.cpp Generic Template
+aliases:
+  - llama-cpp
+  - llama.cpp
+version_specifier: ">=b1000"
+
+supported_memory_topologies:
+  - discrete
+  - unified
+  - system
+
+supported_vendors:
+  - apple
+  - nvidia
+  - generic
+
+supported_families: []
+
+memory_model:
+  base_runtime:
+    lower_bytes: 33554432
+    expected_bytes: 67108864
+    upper_bytes: 134217728
+  per_billion_parameters:
+    lower_bytes: 8388608
+    expected_bytes: 16777216
+    upper_bytes: 33554432
+  workspace_ratio_of_resident_weights:
+    lower: "0.01"
+    expected: "0.03"
+    upper: "0.05"
+  graph_capture_reserve:
+    lower_bytes: 0
+    expected_bytes: 0
+    upper_bytes: 0
+  backend_buffers:
+    lower_bytes: 16777216
+    expected_bytes: 33554432
+    upper_bytes: 67108864
+  allocator_margin_ratio_of_subtotal:
+    lower: "0.01"
+    expected: "0.02"
+    upper: "0.05"
+  graph_capture_supported: false
+  kv_block_size: 1
+
+supported_weight_dtypes:
+  - q4_0
+  - q4_k_m
+  - q8_0
+  - f16
+supported_kv_dtypes:
+  - f16
+  - q8_0
+  - q4_0
+
+confidence: unknown
+status: unverified
+notes:
+  - Generic template backend profile for llama.cpp.
+evidence:
+  - evidence_id: llama-cpp-template-spec
+    source_type: theoretical_spec
+    source: llama.cpp memory usage guidelines
+    notes: Initial template parameters for llama.cpp overhead ranges.

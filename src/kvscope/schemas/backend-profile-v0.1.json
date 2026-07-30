@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KVScope Backend Profile v0.1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "profile_id",
+    "backend_id",
+    "display_name",
+    "memory_model",
+    "confidence",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "backend_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "aliases": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "version_specifier": {
+      "type": ["string", "null"]
+    },
+    "supported_memory_topologies": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["discrete", "unified", "system"]
+      }
+    },
+    "supported_vendors": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "supported_families": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "memory_model": {
+      "type": "object",
+      "required": [
+        "base_runtime",
+        "per_billion_parameters",
+        "workspace_ratio_of_resident_weights",
+        "graph_capture_reserve",
+        "backend_buffers",
+        "allocator_margin_ratio_of_subtotal"
+      ]
+    },
+    "supported_weight_dtypes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "supported_kv_dtypes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["exact", "high", "medium", "low", "unknown"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["experimental", "unverified", "verified", "deprecated"]
+    }
+  }
+}

@@ -1,27 +1,79 @@
-"""Safe loader and validator for model registry entries."""
+"""Safe loaders and validators for KVScope registry entries and profile files."""
 
 import json
 from pathlib import Path
 from typing import Any
 
-from kvscope.errors import RegistryValidationError
+from kvscope.domain.backend import BackendProfile
+from kvscope.domain.hardware import HardwareProfile
+from kvscope.errors import ProfileValidationError, RegistryValidationError
+
+MAX_PROFILE_FILE_SIZE_BYTES = 1_048_576  # 1 MB
 
 
-def _load_file(path: Path) -> Any:
+def safe_load_file_content(path: Path) -> Any:
+    """Safely load JSON or YAML file content with file size and path checks."""
+    resolved_path = path.resolve()
+    if not resolved_path.exists():
+        raise RegistryValidationError(
+            f"File does not exist: {path}",
+            code="registry_file_not_found",
+            source=str(path),
+        )
+    if not resolved_path.is_file():
+        raise RegistryValidationError(
+            f"Path is not a regular file: {path}",
+            code="registry_not_a_file",
+            source=str(path),
+        )
+    stat = resolved_path.stat()
+    if stat.st_size > MAX_PROFILE_FILE_SIZE_BYTES:
+        err_msg = (
+            f"File size exceeds limit ({stat.st_size} > "
+            f"{MAX_PROFILE_FILE_SIZE_BYTES} bytes): {path}"
+        )
+        raise RegistryValidationError(
+            err_msg,
+            code="registry_file_too_large",
+            source=str(path),
+        )
+
+    content = resolved_path.read_text(encoding="utf-8")
     if path.suffix == ".json":
-        return json.loads(path.read_text(encoding="utf-8"))
-    if path.suffix in {".yaml", ".yml"}:
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise RegistryValidationError(
+                f"Invalid JSON content in {path}: {exc}",
+                code="registry_json_parse_error",
+                source=str(path),
+            ) from exc
+    elif path.suffix in {".yaml", ".yml"}:
         try:
             import yaml  # type: ignore[import-untyped]
         except ImportError as exc:
             raise RegistryValidationError(
-                "YAML registry files require PyYAML", code="registry_dependency_missing"
+                "YAML registry files require PyYAML",
+                code="registry_dependency_missing",
             ) from exc
-        return yaml.safe_load(path.read_text(encoding="utf-8"))
-    return None
+        try:
+            return yaml.safe_load(content)
+        except Exception as exc:
+            raise RegistryValidationError(
+                f"Invalid YAML content in {path}: {exc}",
+                code="registry_yaml_parse_error",
+                source=str(path),
+            ) from exc
+    else:
+        raise RegistryValidationError(
+            f"Unsupported profile file format ({path.suffix}): {path}",
+            code="registry_unsupported_format",
+            source=str(path),
+        )
 
 
 def validate_entry(entry: Any, *, path: Path | None = None) -> dict[str, Any]:
+    """Validate a legacy model registry entry dictionary."""
     if not isinstance(entry, dict):
         raise RegistryValidationError(
             "registry entry must be an object",
@@ -77,8 +129,48 @@ def validate_entry(entry: Any, *, path: Path | None = None) -> dict[str, Any]:
     return dict(entry)
 
 
+def parse_hardware_profile(
+    data: Any, *, source_path: Path | str | None = None
+) -> HardwareProfile:
+    """Validate and parse raw dictionary/data into a HardwareProfile domain model."""
+    if not isinstance(data, dict):
+        raise ProfileValidationError(
+            f"Hardware profile data must be a dictionary, got {type(data).__name__}"
+        )
+    if data.get("schema_version") != "0.1":
+        raise ProfileValidationError(
+            f"Unsupported hardware profile schema version: {data.get('schema_version')}"
+        )
+    try:
+        return HardwareProfile.model_validate(data)
+    except Exception as exc:
+        raise ProfileValidationError(
+            f"Invalid hardware profile data from {source_path or 'input'}: {exc}"
+        ) from exc
+
+
+def parse_backend_profile(
+    data: Any, *, source_path: Path | str | None = None
+) -> BackendProfile:
+    """Validate and parse raw dictionary/data into a BackendProfile domain model."""
+    if not isinstance(data, dict):
+        raise ProfileValidationError(
+            f"Backend profile data must be a dictionary, got {type(data).__name__}"
+        )
+    if data.get("schema_version") != "0.1":
+        raise ProfileValidationError(
+            f"Unsupported backend profile schema version: {data.get('schema_version')}"
+        )
+    try:
+        return BackendProfile.model_validate(data)
+    except Exception as exc:
+        raise ProfileValidationError(
+            f"Invalid backend profile data from {source_path or 'input'}: {exc}"
+        ) from exc
+
+
 class ModelRegistry:
-    """In-memory registry loaded explicitly, never during package import."""
+    """In-memory model registry loaded explicitly, never during package import."""
 
     def __init__(self, entries: list[dict[str, Any]] | None = None) -> None:
         self.entries: dict[str, dict[str, Any]] = {}
@@ -108,7 +200,7 @@ class ModelRegistry:
         if directory.exists():
             for path in sorted(directory.iterdir()):
                 if path.suffix in {".json", ".yaml", ".yml"}:
-                    loaded = _load_file(path)
+                    loaded = safe_load_file_content(path)
                     if isinstance(loaded, list):
                         entries.extend(loaded)
                     else:

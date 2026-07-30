@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KVScope Hardware Profile v0.1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "profile_id",
+    "name",
+    "vendor",
+    "memory_topology",
+    "total_memory",
+    "confidence",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "vendor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "family": {
+      "type": ["string", "null"]
+    },
+    "aliases": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "memory_topology": {
+      "type": "string",
+      "enum": ["discrete", "unified", "system"]
+    },
+    "total_memory": {
+      "type": "object",
+      "required": ["value", "unit"],
+      "properties": {
+        "value": { "type": ["string", "number"] },
+        "unit": { "type": "string", "enum": ["bytes", "KiB", "MiB", "GiB"] }
+      }
+    },
+    "reserves": {
+      "type": "object",
+      "properties": {
+        "os_reserve": { "$ref": "#/$defs/byte_range" },
+        "display_reserve": { "$ref": "#/$defs/byte_range" },
+        "background_process_reserve": { "$ref": "#/$defs/byte_range" },
+        "device_specific_reserve": { "$ref": "#/$defs/byte_range" }
+      }
+    },
+    "recommended_headroom_ratio": { "$ref": "#/$defs/ratio_range" },
+    "supported_backend_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["exact", "high", "medium", "low", "unknown"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["experimental", "unverified", "verified", "deprecated"]
+    }
+  },
+  "$defs": {
+    "byte_range": {
+      "type": "object",
+      "required": ["lower_bytes", "expected_bytes", "upper_bytes"],
+      "properties": {
+        "lower_bytes": { "type": "integer", "minimum": 0 },
+        "expected_bytes": { "type": "integer", "minimum": 0 },
+        "upper_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ratio_range": {
+      "type": "object",
+      "required": ["lower", "expected", "upper"],
+      "properties": {
+        "lower": { "type": ["string", "number"] },
+        "expected": { "type": ["string", "number"] },
+        "upper": { "type": ["string", "number"] }
+      }
+    }
+  }
+}

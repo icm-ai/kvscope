@@ -83,11 +83,7 @@ def test_offline_mode_zero_network(tmp_path: Path) -> None:
     mock_api = MagicMock()
     with patch.dict(
         "sys.modules",
-        {
-            "huggingface_hub": MagicMock(
-                hf_hub_download=mock_download, HfApi=mock_api
-            )
-        },
+        {"huggingface_hub": MagicMock(hf_hub_download=mock_download, HfApi=mock_api)},
     ):
         with pytest.raises(OfflineCacheMissError):
             resolve_model(
@@ -150,7 +146,6 @@ def test_multimodal_model_warning() -> None:
     )
 
 
-
 def test_full_provenance_recording() -> None:
     source = dict(CONFIG)
     resolved = resolve_model(source, revision="v1.0")
@@ -162,5 +157,3 @@ def test_full_provenance_recording() -> None:
     assert resolved.source.confidence.value in ("high", "medium")
     assert isinstance(resolved.source.attempts, list)
     assert len(resolved.source.attempts) > 0
-
-

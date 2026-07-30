@@ -51,5 +51,3 @@ def test_bytes_to_unit_rejects_non_integer_types(
 ) -> None:
     with pytest.raises(TypeError, match="bytes must be an integer"):
         converter(invalid_value)  # type: ignore[arg-type]
-
-

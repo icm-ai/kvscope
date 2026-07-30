@@ -154,9 +154,7 @@ def _resolve_bits(
         raise _invalid("dtype", "must be a WeightDType")
     dtype_bits = Fraction(dtype.bits_per_weight) if dtype is not None else None
     custom = (
-        _positive_fraction(custom_bits, field_name)
-        if custom_bits is not None
-        else None
+        _positive_fraction(custom_bits, field_name) if custom_bits is not None else None
     )
     if dtype_bits is not None and custom is not None and dtype_bits != custom:
         raise _invalid(field_name, "conflicts with dtype.bits_per_weight")
@@ -253,14 +251,18 @@ def estimate_weight_memory(
             unquantized_dtype,
             alignment,
         )
-        if any(value is not None for value in formula_inputs) or any(
-            value != 0
-            for value in (
-                scale_bytes_per_group,
-                zero_point_bytes_per_group,
-                metadata_bytes,
+        if (
+            any(value is not None for value in formula_inputs)
+            or any(
+                value != 0
+                for value in (
+                    scale_bytes_per_group,
+                    zero_point_bytes_per_group,
+                    metadata_bytes,
+                )
             )
-        ) or alignment_bytes not in (None, 0):
+            or alignment_bytes not in (None, 0)
+        ):
             raise _invalid(
                 "artifact",
                 "cannot be combined with parameter-count or quantization inputs",
@@ -280,21 +282,24 @@ def estimate_weight_memory(
     )
     if alignment is not None:
         _positive_int(alignment, "alignment")
-    if unquantized_dtype is not None and not isinstance(
-        unquantized_dtype, WeightDType
-    ):
+    if unquantized_dtype is not None and not isinstance(unquantized_dtype, WeightDType):
         raise _invalid("unquantized_dtype", "must be a WeightDType")
 
-    group_mode = any(
-        value is not None
-        for value in (
-            quantized_parameter_count,
-            quantization_bits,
-            group_size,
-            unquantized_parameter_count,
-            unquantized_fraction,
+    group_mode = (
+        any(
+            value is not None
+            for value in (
+                quantized_parameter_count,
+                quantization_bits,
+                group_size,
+                unquantized_parameter_count,
+                unquantized_fraction,
+            )
         )
-    ) or scale_bytes != 0 or zero_point_bytes != 0 or unquantized_dtype is not None
+        or scale_bytes != 0
+        or zero_point_bytes != 0
+        or unquantized_dtype is not None
+    )
 
     if not group_mode:
         bits = _resolve_bits(
@@ -395,8 +400,10 @@ def estimate_weight_memory(
             "unquantized_parameter_count",
             "quantized and unquantized counts exceed parameter_count",
         )
-    if quantized_parameter_count is not None and explicit_unquantized and (
-        quantized_count + unquantized_count != total_parameters
+    if (
+        quantized_parameter_count is not None
+        and explicit_unquantized
+        and (quantized_count + unquantized_count != total_parameters)
     ):
         raise _invalid(
             "quantized_parameter_count",

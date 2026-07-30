@@ -1,0 +1,36 @@
+{
+  "schema_version": "0.1",
+  "profile_id": "generic-system-32gib",
+  "name": "Generic CPU System Memory (32 GiB)",
+  "vendor": "generic",
+  "family": "system-memory",
+  "aliases": ["system-32gb", "system-32gib"],
+  "memory_topology": "system",
+  "total_memory": {
+    "value": "32",
+    "unit": "GiB"
+  },
+  "reserves": {
+    "os_reserve": { "lower_bytes": 2147483648, "expected_bytes": 4294967296, "upper_bytes": 6442450944 },
+    "display_reserve": { "lower_bytes": 0, "expected_bytes": 0, "upper_bytes": 0 },
+    "background_process_reserve": { "lower_bytes": 1073741824, "expected_bytes": 2147483648, "upper_bytes": 4294967296 },
+    "device_specific_reserve": { "lower_bytes": 0, "expected_bytes": 0, "upper_bytes": 0 }
+  },
+  "recommended_headroom_ratio": {
+    "lower": "0.10",
+    "expected": "0.15",
+    "upper": "0.25"
+  },
+  "supported_backend_ids": ["llama_cpp"],
+  "notes": ["Generic 32 GiB CPU host system memory profile."],
+  "evidence": [
+    {
+      "evidence_id": "generic-system-32gib-spec",
+      "source_type": "theoretical_spec",
+      "source": "Standard 32 GiB system RAM specification",
+      "notes": "System RAM reserve estimates."
+    }
+  ],
+  "confidence": "unknown",
+  "status": "unverified"
+}

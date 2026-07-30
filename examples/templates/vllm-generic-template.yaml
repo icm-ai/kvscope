@@ -1,0 +1,68 @@
+schema_version: "0.1"
+profile_id: vllm-generic-template
+backend_id: vllm
+display_name: vLLM Generic Template
+aliases:
+  - vllm
+  - vllm-template
+version_specifier: ">=0.4.0,<1.0.0"
+
+supported_memory_topologies:
+  - discrete
+  - unified
+
+supported_vendors:
+  - nvidia
+  - amd
+  - generic
+
+supported_families: []
+
+memory_model:
+  base_runtime:
+    lower_bytes: 268435456
+    expected_bytes: 536870912
+    upper_bytes: 1073741824
+  per_billion_parameters:
+    lower_bytes: 33554432
+    expected_bytes: 67108864
+    upper_bytes: 134217728
+  workspace_ratio_of_resident_weights:
+    lower: "0.02"
+    expected: "0.05"
+    upper: "0.10"
+  graph_capture_reserve:
+    lower_bytes: 536870912
+    expected_bytes: 1073741824
+    upper_bytes: 2147483648
+  backend_buffers:
+    lower_bytes: 67108864
+    expected_bytes: 134217728
+    upper_bytes: 268435456
+  allocator_margin_ratio_of_subtotal:
+    lower: "0.03"
+    expected: "0.05"
+    upper: "0.08"
+  graph_capture_supported: true
+  kv_block_size: 16
+
+supported_weight_dtypes:
+  - float16
+  - bfloat16
+  - int8
+  - int4
+supported_kv_dtypes:
+  - auto
+  - float16
+  - bfloat16
+  - fp8
+
+confidence: unknown
+status: unverified
+notes:
+  - Generic template backend profile for vLLM.
+evidence:
+  - evidence_id: vllm-template-spec
+    source_type: theoretical_spec
+    source: vLLM documentation and default allocator behavior
+    notes: Initial template parameters for vLLM runtime overhead ranges.

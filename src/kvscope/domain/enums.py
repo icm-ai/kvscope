@@ -21,6 +21,15 @@ class Confidence(StrEnum):
     UNKNOWN = "unknown"
 
 
+class ProfileStatus(StrEnum):
+    """Lifecycle status of a hardware or backend profile."""
+
+    EXPERIMENTAL = "experimental"
+    UNVERIFIED = "unverified"
+    VERIFIED = "verified"
+    DEPRECATED = "deprecated"
+
+
 class FeasibilityStatus(StrEnum):
     """High-level deployment feasibility status."""
 

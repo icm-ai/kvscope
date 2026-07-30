@@ -1,6 +1,5 @@
 """Tests for kvscope.api and kvscope.errors module exports and exception hierarchy."""
 
-
 import kvscope.api as api
 from kvscope.errors import (
     InvalidModelConfigError,

@@ -73,3 +73,43 @@ estimated_resident_weight_bytes = artifact_storage_bytes
 该模式只消费上游已经解析的字节摘要。artifact storage bytes 是磁盘/产物
 表示的字节数，不等同于设备常驻内存；mmap、加载器缓冲区、运行时开销和
 allocator 行为不在本阶段估算范围内，结果会明确给出 warning。
+
+---
+
+# Phase 6 公式：Hardware Budget & Runtime Overhead Engine
+
+## Hardware Memory Budget
+
+```text
+total_non_model_reserve =
+  os_reserve + display_reserve + background_process_reserve + device_specific_reserve + user_reserve
+
+allocatable_before_headroom.lower    = max(0, total_memory - total_non_model_reserve.upper)
+allocatable_before_headroom.expected = max(0, total_memory - total_non_model_reserve.expected)
+allocatable_before_headroom.upper    = max(0, total_memory - total_non_model_reserve.lower)
+
+recommended_headroom = allocatable_before_headroom × recommended_headroom_ratio
+
+recommended_allocatable.lower    = max(0, allocatable_before_headroom.lower - recommended_headroom.upper)
+recommended_allocatable.expected = max(0, allocatable_before_headroom.expected - recommended_headroom.expected)
+recommended_allocatable.upper    = max(0, allocatable_before_headroom.upper - recommended_headroom.lower)
+```
+
+## Runtime Overhead Engine
+
+```text
+param_in_billions = parameter_count / 1,000,000,000
+parameter_scaled_overhead = per_billion_parameters × param_in_billions
+workspace = resident_weight_bytes × workspace_ratio_of_resident_weights
+graph_capture = (graph_capture_reserve if graph_capture_enabled else 0)
+
+subtotal_before_allocator_margin =
+  base_runtime + parameter_scaled_overhead + workspace + graph_capture + backend_buffers
+
+allocator_margin = subtotal_before_allocator_margin × allocator_margin_ratio_of_subtotal
+
+total_runtime_overhead = subtotal_before_allocator_margin + allocator_margin
+```
+
+所有比例和乘除计算均使用 Decimal 并通过 `math.ceil` 向上取整为整数 bytes。
+

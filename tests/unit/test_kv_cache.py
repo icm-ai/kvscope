@@ -127,9 +127,7 @@ def test_attention_layouts_use_kv_head_count(
     context_a=st.integers(min_value=1, max_value=2048),
     context_delta=st.integers(min_value=0, max_value=2048),
 )
-def test_context_tokens_are_monotonic(
-    context_a: int, context_delta: int
-) -> None:
+def test_context_tokens_are_monotonic(context_a: int, context_delta: int) -> None:
     first = estimate_kv_cache(
         model(), config(context=context_a), backend(block_size=16)
     )
@@ -145,9 +143,7 @@ def test_context_tokens_are_monotonic(
     active_a=st.integers(min_value=1, max_value=128),
     active_delta=st.integers(min_value=0, max_value=128),
 )
-def test_active_sequences_are_monotonic(
-    active_a: int, active_delta: int
-) -> None:
+def test_active_sequences_are_monotonic(active_a: int, active_delta: int) -> None:
     first = estimate_kv_cache(
         model(), config(batch_size=active_a), backend(block_size=16)
     )
@@ -180,15 +176,11 @@ def test_block_alignment_is_ceil_and_waste_is_nonnegative(
     assert inputs.allocated_tokens >= inputs.effective_tokens
     assert inputs.allocated_tokens % block_size == 0
     assert result.allocated_bytes >= result.raw_bytes
-    assert result.alignment_waste_bytes == (
-        result.allocated_bytes - result.raw_bytes
-    )
+    assert result.alignment_waste_bytes == (result.allocated_bytes - result.raw_bytes)
 
 
 def test_unaligned_block_size_none_returns_exact_raw_bytes() -> None:
-    result = estimate_kv_cache(
-        model(), config(context=100), backend(block_size=None)
-    )
+    result = estimate_kv_cache(model(), config(context=100), backend(block_size=None))
     assert result.allocated_bytes == result.raw_bytes
     assert result.alignment_waste_bytes == 0
 
@@ -267,7 +259,6 @@ def test_prefix_shared_calculates_prefix_memory_once() -> None:
     assert shared_result.raw_bytes == 128 * (10 * 4 + 100)
     assert unshared_result.raw_bytes == 128 * (110 * 4)
     assert shared_result.raw_bytes < unshared_result.raw_bytes
-
 
 
 @pytest.mark.parametrize(
@@ -388,9 +379,7 @@ def test_engine_rejects_unsupported_kv_dtype() -> None:
     )
 
     with pytest.raises(ValueError, match="does not support KV dtype"):
-        estimate_kv_cache(
-            model(), config(kv_dtype=KVDType.FP8), unsupported_backend
-        )
+        estimate_kv_cache(model(), config(kv_dtype=KVDType.FP8), unsupported_backend)
 
 
 def test_kv_cache_estimate_properties_and_to_estimate_component() -> None:
@@ -452,6 +441,3 @@ def test_formula_rejects_negative_token_counts() -> None:
     msg = "context_tokens must be a non-negative integer"
     with pytest.raises(ValueError, match=msg):
         calculate_kv_cache(inputs)
-
-
-

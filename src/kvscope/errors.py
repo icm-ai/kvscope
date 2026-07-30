@@ -1,8 +1,4 @@
-"""Exception hierarchy for KVScope.
-
-Concrete error behavior is intentionally deferred until the resolver and
-calculation phases.
-"""
+"""Exception hierarchy for KVScope."""
 
 
 class KVScopeError(Exception):
@@ -62,3 +58,88 @@ class UnsupportedArchitectureError(ModelResolutionError, ValueError):
 
 class ProfileValidationError(KVScopeError, ValueError):
     """Raised when a hardware or backend profile is invalid."""
+
+
+class HardwareProfileError(KVScopeError):
+    """Base class for hardware profile resolution and validation errors."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "hardware_profile_error",
+        profile_id: str | None = None,
+        suggestion: str | None = None,
+    ) -> None:
+        self.code = code
+        self.profile_id = profile_id
+        self.suggestion = suggestion
+        super().__init__(message)
+
+
+class HardwareProfileNotFoundError(HardwareProfileError):
+    """A requested hardware profile was not found in registry or paths."""
+
+
+class HardwareProfileConflictError(HardwareProfileError):
+    """Hardware profile ID or alias conflicts with existing entries."""
+
+
+class BackendProfileError(KVScopeError):
+    """Base class for backend profile resolution and validation errors."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "backend_profile_error",
+        backend_id: str | None = None,
+        version: str | None = None,
+        hardware_id: str | None = None,
+        profile_id: str | None = None,
+        suggestion: str | None = None,
+    ) -> None:
+        self.code = code
+        self.backend_id = backend_id
+        self.version = version
+        self.hardware_id = hardware_id
+        self.profile_id = profile_id
+        self.suggestion = suggestion
+        super().__init__(message)
+
+
+class BackendProfileNotFoundError(BackendProfileError):
+    """A requested backend profile was not found."""
+
+
+class BackendProfileAmbiguousError(BackendProfileError):
+    """Multiple backend profiles matched with equal top priority."""
+
+
+class BackendVersionMismatchError(BackendProfileError):
+    """Backend version specifier does not match the requested backend version."""
+
+
+class IncompleteBackendProfileError(BackendProfileError):
+    """A profile is marked incomplete and requires explicit override or flag."""
+
+
+class RuntimeOverheadInputError(KVScopeError):
+    """Raised when inputs to runtime overhead estimation are invalid."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "runtime_overhead_input_error",
+        field_name: str | None = None,
+        suggestion: str | None = None,
+    ) -> None:
+        self.code = code
+        self.field_name = field_name
+        self.suggestion = suggestion
+        super().__init__(message)
+
+
+class UnsupportedMemoryTopologyError(KVScopeError):
+    """Raised when a memory topology is unsupported by a backend or profile."""

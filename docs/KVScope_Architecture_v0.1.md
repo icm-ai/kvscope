@@ -442,11 +442,9 @@ from typing import Protocol
 
 
 class ModelResolver(Protocol):
-    def can_resolve(self, source: str) -> bool:
-        ...
+    def can_resolve(self, source: str) -> bool: ...
 
-    def resolve(self, source: str) -> ModelSpec:
-        ...
+    def resolve(self, source: str) -> ModelSpec: ...
 ```
 
 Resolver 链：
@@ -494,8 +492,7 @@ d_model / hidden_size
 class ArchitectureAdapter(Protocol):
     architecture_names: set[str]
 
-    def normalize(self, raw_config: dict) -> ModelSpec:
-        ...
+    def normalize(self, raw_config: dict) -> ModelSpec: ...
 ```
 
 首批 adapter：
@@ -518,8 +515,7 @@ def estimate_weight_memory(
     model: ModelSpec,
     dtype: WeightDType,
     artifact: WeightArtifact | None,
-) -> EstimateComponent:
-    ...
+) -> EstimateComponent: ...
 ```
 
 优先级：
@@ -556,8 +552,7 @@ def estimate_kv_cache(
     model: ModelSpec,
     config: InferenceConfig,
     backend: BackendSpec,
-) -> EstimateComponent:
-    ...
+) -> EstimateComponent: ...
 ```
 
 基础计算：
@@ -604,8 +599,7 @@ def estimate_runtime_overhead(
     hardware: HardwareSpec,
     backend: BackendSpec,
     config: InferenceConfig,
-) -> list[EstimateComponent]:
-    ...
+) -> list[EstimateComponent]: ...
 ```
 
 拆分：
@@ -647,8 +641,7 @@ total_memory
 def evaluate_feasibility(
     estimate: MemoryEstimate,
     hardware: HardwareSpec,
-) -> FeasibilityResult:
-    ...
+) -> FeasibilityResult: ...
 ```
 
 建议阈值：
@@ -910,7 +903,7 @@ JSON 是事实源，Terminal 和 Markdown 由 JSON report 渲染。
 展示时再转换为 GiB：
 
 ```python
-gib = bytes_value / (1024 ** 3)
+gib = bytes_value / (1024**3)
 ```
 
 ### 15.3 Schema Version
@@ -934,20 +927,16 @@ class KVScopeError(Exception):
     code: str
 
 
-class ModelResolutionError(KVScopeError):
-    ...
+class ModelResolutionError(KVScopeError): ...
 
 
-class InvalidModelConfigError(KVScopeError):
-    ...
+class InvalidModelConfigError(KVScopeError): ...
 
 
-class UnsupportedArchitectureError(KVScopeError):
-    ...
+class UnsupportedArchitectureError(KVScopeError): ...
 
 
-class ProfileValidationError(KVScopeError):
-    ...
+class ProfileValidationError(KVScopeError): ...
 ```
 
 错误输出必须包含：

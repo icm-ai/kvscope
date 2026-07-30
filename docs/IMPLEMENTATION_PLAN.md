@@ -78,6 +78,19 @@ mypy、pytest 和覆盖率门禁。
 
 本阶段不下载或加载权重，不执行远程代码，不实现 Hardware/Backend Resolver、Runtime Overhead、Feasibility、Recommendation、Benchmark、Web UI 或 InferPilot。
 
+## Phase 6：Hardware Registry, Backend Profile & Runtime Overhead Engine — 已完成
+
+交付内容：
+- Hardware Profile Schema (v0.1) 与 Hardware Registry，支持 6 个通用硬件容量 Profile（discrete 8/16/24G, unified 16/32G, system 32G）。
+- Hardware Memory Budget 计算引擎（非模型预留 OS/Display/Background/Device/User 拆分，区间的 allocatable 与 recommended headroom 规约）。
+- Backend Profile Schema (v0.1) 与 Backend Registry，支持 `packaging.specifiers` 版本匹配规则及候选优先级 Scoring 机制。
+- Runtime Overhead Engine 纯计算引擎（包含 Base Runtime, Parameter Scaled, Workspace, Graph Capture, Backend Buffers, Allocator Margin）。
+- `ByteRange` 与 `RatioRange` 不确定性区间传播及 ceiling integer bytes 运算。
+- JSON, Terminal, Markdown 格式化序列化输出与 `kvscope hardware`, `kvscope backend`, `kvscope estimate-overhead` CLI 子命令。
+- Unit tests, Hypothesis Property-based tests 与 Golden Cases A/B/C 测试套件。
+
+本阶段明确未实现 Feasibility 最终判断、Status 判断、Recommendation 引擎、自动硬件探测、自动调优或远程后端连接。
+
 ## 后续：Runtime Calibration（未开始）
 
 交付内容：

@@ -49,9 +49,7 @@ class KVCacheFormulaInputs:
     @property
     def effective_tokens(self) -> int:
         """Return all tokens reserved per active sequence."""
-        return (
-            self.context_tokens + self.prefix_tokens + self.multimodal_tokens
-        )
+        return self.context_tokens + self.prefix_tokens + self.multimodal_tokens
 
     @property
     def allocated_tokens(self) -> int:
@@ -203,9 +201,7 @@ def calculate_kv_cache(inputs: KVCacheFormulaInputs) -> KVCacheEstimate:
             + prefix_allocated_tokens
         )
     else:
-        raw_bytes = (
-            bytes_per_token * inputs.effective_tokens * inputs.active_sequences
-        )
+        raw_bytes = bytes_per_token * inputs.effective_tokens * inputs.active_sequences
         allocated_bytes = (
             bytes_per_token * inputs.allocated_tokens * inputs.active_sequences
         )
@@ -218,7 +214,6 @@ def calculate_kv_cache(inputs: KVCacheFormulaInputs) -> KVCacheEstimate:
         bytes_per_token=bytes_per_token,
         bytes_per_sequence=bytes_per_token * inputs.effective_tokens,
     )
-
 
 
 def estimate_kv_cache(
@@ -249,4 +244,3 @@ def estimate_kv_cache(
             active_sequences_source=config.active_sequences_source,
         )
     )
-

@@ -1,0 +1,36 @@
+{
+  "schema_version": "0.1",
+  "profile_id": "generic-discrete-16gib",
+  "name": "Generic Discrete GPU (16 GiB)",
+  "vendor": "generic",
+  "family": "discrete-gpu",
+  "aliases": ["discrete-16gb", "discrete-16gib"],
+  "memory_topology": "discrete",
+  "total_memory": {
+    "value": "16",
+    "unit": "GiB"
+  },
+  "reserves": {
+    "os_reserve": { "lower_bytes": 0, "expected_bytes": 0, "upper_bytes": 0 },
+    "display_reserve": { "lower_bytes": 268435456, "expected_bytes": 536870912, "upper_bytes": 1073741824 },
+    "background_process_reserve": { "lower_bytes": 0, "expected_bytes": 0, "upper_bytes": 0 },
+    "device_specific_reserve": { "lower_bytes": 134217728, "expected_bytes": 268435456, "upper_bytes": 536870912 }
+  },
+  "recommended_headroom_ratio": {
+    "lower": "0.05",
+    "expected": "0.10",
+    "upper": "0.15"
+  },
+  "supported_backend_ids": ["vllm", "llama_cpp"],
+  "notes": ["Generic 16 GiB discrete GPU profile."],
+  "evidence": [
+    {
+      "evidence_id": "generic-discrete-16gib-spec",
+      "source_type": "theoretical_spec",
+      "source": "Standard 16 GiB VRAM specification",
+      "notes": "Generic profile derived from standard 16384 MiB VRAM layout."
+    }
+  ],
+  "confidence": "unknown",
+  "status": "unverified"
+}

@@ -61,4 +61,3 @@ def test_dtype_enums_expose_storage_precision() -> None:
     assert WeightDType.FP16.bits_per_weight == 16
     assert KVDType.FP16.bytes_per_element == 2
     assert KVDType.INT8.bytes_per_element == 1
-

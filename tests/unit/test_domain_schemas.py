@@ -156,7 +156,6 @@ def test_model_spec_rejects_inconsistent_heads() -> None:
         ModelSpec.model_validate(payload)
 
 
-
 def test_model_spec_rejects_inconsistent_moe_and_parameter_counts() -> None:
     payload = model().model_dump()
     payload["num_experts"] = 4
@@ -190,7 +189,6 @@ def test_inference_config_supports_explicit_active_sequences_override() -> None:
     )
     assert conf.active_sequences == 8
     assert conf.active_sequences_source == "explicit"
-
 
 
 def test_estimate_component_rejects_inverted_or_out_of_range_bounds() -> None:
@@ -371,4 +369,3 @@ def test_inference_config_traces_active_sequences_source() -> None:
     )
     assert cfg3.active_sequences == 4
     assert cfg3.active_sequences_source == "equal"
-

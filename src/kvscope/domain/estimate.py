@@ -31,11 +31,9 @@ class EstimateComponent(DomainModel):
         ):
             raise ValueError("lower_bound_bytes must not exceed upper_bound_bytes")
         if (
-            self.lower_bound_bytes is not None
-            and self.bytes < self.lower_bound_bytes
+            self.lower_bound_bytes is not None and self.bytes < self.lower_bound_bytes
         ) or (
-            self.upper_bound_bytes is not None
-            and self.bytes > self.upper_bound_bytes
+            self.upper_bound_bytes is not None and self.bytes > self.upper_bound_bytes
         ):
             raise ValueError("bytes must be within estimate bounds")
         return self

@@ -401,7 +401,9 @@ def test_weight_estimate_validation_errors() -> None:
     # Unquantized dtype invalid type
     with pytest.raises(InvalidModelConfigError, match=msg3):
         estimate_weight_memory(
-            100, dtype=WeightDType.FP16, unquantized_dtype="invalid"  # type: ignore[arg-type]
+            100,
+            dtype=WeightDType.FP16,
+            unquantized_dtype="invalid",  # type: ignore[arg-type]
         )
 
     # Group mode with invalid dtype
@@ -467,9 +469,6 @@ def test_weight_estimate_validation_errors() -> None:
         unquantized_dtype=WeightDType.FP16,
     )
     assert res_fraction.total_bytes > 0
-
-
-
 
 
 def test_weight_memory_estimate_model_validators() -> None:
@@ -577,7 +576,3 @@ def test_weight_memory_estimate_model_validators() -> None:
             warnings=(),
             estimated_resident_weight_bytes=200,
         )
-
-
-
-

@@ -1,0 +1,36 @@
+{
+  "schema_version": "0.1",
+  "profile_id": "generic-unified-16gib",
+  "name": "Generic Unified Memory System (16 GiB)",
+  "vendor": "generic",
+  "family": "unified-memory",
+  "aliases": ["unified-16gb", "unified-16gib"],
+  "memory_topology": "unified",
+  "total_memory": {
+    "value": "16",
+    "unit": "GiB"
+  },
+  "reserves": {
+    "os_reserve": { "lower_bytes": 2147483648, "expected_bytes": 3221225472, "upper_bytes": 4294967296 },
+    "display_reserve": { "lower_bytes": 268435456, "expected_bytes": 536870912, "upper_bytes": 1073741824 },
+    "background_process_reserve": { "lower_bytes": 536870912, "expected_bytes": 1073741824, "upper_bytes": 1610612736 },
+    "device_specific_reserve": { "lower_bytes": 0, "expected_bytes": 0, "upper_bytes": 0 }
+  },
+  "recommended_headroom_ratio": {
+    "lower": "0.10",
+    "expected": "0.15",
+    "upper": "0.20"
+  },
+  "supported_backend_ids": ["llama_cpp", "vllm"],
+  "notes": ["Generic 16 GiB unified memory profile. Memory is shared with OS and user applications."],
+  "evidence": [
+    {
+      "evidence_id": "generic-unified-16gib-spec",
+      "source_type": "theoretical_spec",
+      "source": "Standard 16 GiB unified memory architecture",
+      "notes": "Unified memory reserve estimates for desktop operating system overhead."
+    }
+  ],
+  "confidence": "unknown",
+  "status": "unverified"
+}

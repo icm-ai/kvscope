@@ -50,5 +50,3 @@ class InferenceConfig(DomainModel):
         if self.max_num_seqs > self.batch_size:
             return "max_num_seqs"
         return "equal"
-
-
