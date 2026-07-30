@@ -86,6 +86,13 @@ class WeightMemoryEstimate:
                 "estimated_resident_weight_bytes must equal total_bytes when set"
             )
 
+    @property
+    def resident_weight_bytes(self) -> int:
+        """Return the estimated resident weight memory size in integer bytes."""
+        if self.estimated_resident_weight_bytes is not None:
+            return self.estimated_resident_weight_bytes
+        return self.total_bytes
+
     def to_estimate_component(self) -> EstimateComponent:
         """Convert the result to the existing report component schema."""
         return EstimateComponent(

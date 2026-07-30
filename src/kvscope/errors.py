@@ -143,3 +143,27 @@ class RuntimeOverheadInputError(KVScopeError):
 
 class UnsupportedMemoryTopologyError(KVScopeError):
     """Raised when a memory topology is unsupported by a backend or profile."""
+
+
+class MemoryAggregationError(KVScopeError):
+    """Base exception for memory aggregation errors."""
+
+
+class MissingMemoryComponentError(MemoryAggregationError):
+    """Raised when a required memory component is missing in strict mode."""
+
+
+class InvalidMemoryEstimateError(MemoryAggregationError):
+    """Raised when a component estimate contains invalid data."""
+
+
+class FeasibilityEvaluationError(KVScopeError):
+    """Base exception for feasibility evaluation errors."""
+
+
+class IncompleteRequirementError(FeasibilityEvaluationError):
+    """Raised when strict mode detects an incomplete requirement."""
+
+
+class ConstraintAnalysisError(KVScopeError):
+    """Base exception for constraint analysis errors."""

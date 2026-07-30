@@ -2,7 +2,9 @@
 
 from kvscope.domain.memory_budget import HardwareMemoryBudget
 from kvscope.domain.ranges import ByteRange
+from kvscope.domain.report import MemoryFeasibilityReport
 from kvscope.domain.runtime_overhead import RuntimeOverheadEstimate
+from kvscope.domain.signed_ranges import SignedByteRange
 from kvscope.domain.units import bytes_to_gib
 
 
@@ -25,6 +27,14 @@ def _row(name: str, br: ByteRange, is_bold: bool = False) -> str:
         return (
             f"| {b_name} | **{l_g:.2f}** | **{e_g:.2f}** | **{u_g:.2f}** | `{exp_b}` |"
         )
+    return f"| {name} | {l_g:.2f} | {e_g:.2f} | {u_g:.2f} | `{exp_b}` |"
+
+
+def _sbr_row(name: str, sbr: SignedByteRange) -> str:
+    l_g = bytes_to_gib(sbr.lower_bytes)
+    e_g = bytes_to_gib(sbr.expected_bytes)
+    u_g = bytes_to_gib(sbr.upper_bytes)
+    exp_b = sbr.expected_bytes
     return f"| {name} | {l_g:.2f} | {e_g:.2f} | {u_g:.2f} | `{exp_b}` |"
 
 
@@ -102,5 +112,133 @@ def serialize_overhead_to_markdown(estimate: RuntimeOverheadEstimate) -> str:
         lines.append("")
         for w in estimate.warnings:
             lines.append(f"> [!WARNING]\n> {w}")
+
+    return "\n".join(lines)
+
+
+def serialize_feasibility_report_markdown(report: MemoryFeasibilityReport) -> str:
+    """Serialize MemoryFeasibilityReport to Markdown format."""
+    agg = report.aggregation
+    feas = report.feasibility
+    con = report.constraint_analysis
+
+    lines: list[str] = [
+        "# KVScope Memory Feasibility Report",
+        "",
+        f"- **Product Status**: `{feas.product_status.value.upper()}`",
+        f"- **Internal Status**: `{feas.internal_status.value}`",
+        f"- **Confidence**: `{feas.confidence.value.upper()}`",
+        f"- **Primary Boundary**: `{feas.primary_boundary or 'N/A'}`",
+        f"- **Explanation**: {feas.explanation}",
+        "",
+    ]
+
+    if agg.is_partial:
+        lines.extend(
+            [
+                "> [!WARNING]",
+                "> **Partial Estimate**: Memory requirement calculation is incomplete.",
+                f"> Missing components: `{agg.missing_components}`",
+                "",
+            ]
+        )
+
+    header_row = (
+        "| Component | Lower (GiB) | Expected (GiB) | Upper (GiB) | Bytes (Expected) |"
+    )
+    sep_row = "| :--- | :--- | :--- | :--- | :--- |"
+
+    lines.extend(
+        [
+            "## Memory Requirement Breakdown",
+            "",
+            header_row,
+            sep_row,
+            _row("Resident Weights", agg.resident_weights.memory),
+            _row("Allocated KV Cache", agg.kv_cache.memory),
+            _row("Runtime Overhead", agg.runtime_overhead.memory),
+            _row("Known Subtotal", agg.known_subtotal, is_bold=True),
+        ]
+    )
+
+    if not agg.is_partial and agg.total_requirement is not None:
+        lines.append(_row("Total Requirement", agg.total_requirement, is_bold=True))
+
+    tot_gib = bytes_to_gib(feas.physical_total_bytes)
+    tot_row = (
+        f"| Physical Total Memory | {tot_gib:.2f} | {tot_gib:.2f} | "
+        f"{tot_gib:.2f} | `{feas.physical_total_bytes}` |"
+    )
+    budget_header_row = (
+        "| Budget Tier | Lower (GiB) | Expected (GiB) | Upper (GiB) | Bytes |"
+    )
+    lines.extend(
+        [
+            "",
+            "## Hardware Memory Budget",
+            "",
+            budget_header_row,
+            sep_row,
+            tot_row,
+            _row("Allocatable (Before Headroom)", feas.allocatable_before_headroom),
+            _row("Recommended Allocatable", feas.recommended_allocatable, is_bold=True),
+        ]
+    )
+
+    boundary_header_row = (
+        "| Boundary Level | Lower (GiB) | Expected (GiB) | Upper (GiB) | Bytes |"
+    )
+    lines.extend(
+        [
+            "",
+            "## Memory Headroom / Deficit Range",
+            "",
+            boundary_header_row,
+            sep_row,
+        ]
+    )
+    if feas.headroom_vs_physical is not None:
+        lines.append(_sbr_row("Versus Physical Memory", feas.headroom_vs_physical))
+    if feas.headroom_vs_allocatable is not None:
+        lines.append(
+            _sbr_row("Versus Allocatable Budget", feas.headroom_vs_allocatable)
+        )
+    if feas.headroom_vs_recommended is not None:
+        lines.append(
+            _sbr_row("Versus Recommended Budget", feas.headroom_vs_recommended)
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Identified Constraints",
+            "",
+        ]
+    )
+    if not con.constraints:
+        lines.append("_No active risk constraints identified._")
+    else:
+        lines.extend(
+            [
+                "| Severity | Code | Component | Explanation |",
+                "| :--- | :--- | :--- | :--- |",
+            ]
+        )
+        for c in con.constraints:
+            comp_str = c.component or "N/A"
+            c_sev = c.severity.value.upper()
+            lines.append(f"| `{c_sev}` | `{c.code}` | `{comp_str}` | {c.explanation} |")
+
+    if feas.warnings:
+        lines.extend(["", "### Warnings", ""])
+        for w in feas.warnings:
+            lines.append(f"> [!WARNING]\n> {w}")
+
+    if feas.evidence:
+        lines.extend(["", "### Evidence", ""])
+        for ev in feas.evidence:
+            lines.append(
+                f"- **[{ev.evidence_id}]** {ev.source} _(Type: {ev.source_type})_"
+            )
 
     return "\n".join(lines)

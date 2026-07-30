@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MemoryFeasibilityReport",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "aggregation",
+    "feasibility",
+    "constraint_analysis"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "aggregation": { "$ref": "memory-requirement-v0.1.json" },
+    "feasibility": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "internal_status",
+        "product_status",
+        "known_subtotal",
+        "physical_total_bytes",
+        "allocatable_before_headroom",
+        "recommended_allocatable",
+        "confidence",
+        "is_actionable",
+        "explanation"
+      ],
+      "properties": {
+        "schema_version": { "type": "string" },
+        "internal_status": { "type": "string" },
+        "product_status": { "type": "string" },
+        "physical_total_bytes": { "type": "integer", "minimum": 0 },
+        "confidence": { "type": "string" },
+        "is_actionable": { "type": "boolean" },
+        "explanation": { "type": "string" }
+      }
+    },
+    "constraint_analysis": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "constraints",
+        "confidence"
+      ],
+      "properties": {
+        "schema_version": { "type": "string" },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["code", "severity", "category", "title", "explanation"]
+          }
+        },
+        "confidence": { "type": "string" }
+      }
+    }
+  }
+}

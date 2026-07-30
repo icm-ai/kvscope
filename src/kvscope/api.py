@@ -14,8 +14,25 @@ from kvscope.calculators.weights import (
     WeightMemoryEstimate,
     estimate_weight_memory,
 )
+from kvscope.domain.aggregation import (
+    MemoryAggregationResult,
+    MemoryComponentRequirement,
+)
 from kvscope.domain.backend import BackendMemoryModel, BackendProfile, BackendSpec
 from kvscope.domain.config import InferenceConfig
+from kvscope.domain.constraints import (
+    ConstraintAnalysis,
+    ConstraintPolicy,
+    ConstraintSeverity,
+    MemoryConstraint,
+)
+from kvscope.domain.enums import (
+    Confidence,
+    FeasibilityStatus,
+    InternalFeasibilityStatus,
+    MemoryTopology,
+    ProductFeasibilityStatus,
+)
 from kvscope.domain.estimate import EstimateComponent, MemoryEstimate
 from kvscope.domain.feasibility import FeasibilityResult
 from kvscope.domain.hardware import (
@@ -27,23 +44,39 @@ from kvscope.domain.memory_budget import HardwareMemoryBudget
 from kvscope.domain.model import ModelSpec
 from kvscope.domain.model_source import ModelSource, ResolvedModel, ResolverAttempt
 from kvscope.domain.ranges import ByteRange, RatioRange
-from kvscope.domain.report import AnalysisReport
+from kvscope.domain.report import AnalysisReport, MemoryFeasibilityReport
 from kvscope.domain.runtime_overhead import (
     RuntimeOverheadEstimate,
     RuntimeOverheadOverrides,
 )
+from kvscope.domain.signed_ranges import (
+    SignedByteRange,
+    subtract_byte_ranges,
+    subtract_exact_bytes_from_range,
+    subtract_range_from_exact_bytes,
+)
 from kvscope.domain.weight import WeightArtifactSummary
+from kvscope.engines.aggregation import aggregate_memory_requirements
+from kvscope.engines.analysis import assess_memory_feasibility
+from kvscope.engines.constraints import analyze_memory_constraints
+from kvscope.engines.feasibility import evaluate_memory_feasibility
 from kvscope.errors import (
     BackendProfileAmbiguousError,
     BackendProfileError,
     BackendProfileNotFoundError,
     BackendVersionMismatchError,
+    ConstraintAnalysisError,
+    FeasibilityEvaluationError,
     HardwareProfileConflictError,
     HardwareProfileError,
     HardwareProfileNotFoundError,
     IncompleteBackendProfileError,
+    IncompleteRequirementError,
+    InvalidMemoryEstimateError,
     InvalidModelConfigError,
     KVScopeError,
+    MemoryAggregationError,
+    MissingMemoryComponentError,
     ModelConfigConflictError,
     ModelConfigParseError,
     ModelSourceNotFoundError,
@@ -73,8 +106,15 @@ __all__ = [
     "BackendSpec",
     "BackendVersionMismatchError",
     "ByteRange",
+    "Confidence",
+    "ConstraintAnalysis",
+    "ConstraintAnalysisError",
+    "ConstraintPolicy",
+    "ConstraintSeverity",
     "EstimateComponent",
+    "FeasibilityEvaluationError",
     "FeasibilityResult",
+    "FeasibilityStatus",
     "HardwareMemoryBudget",
     "HardwareProfile",
     "HardwareProfileConflictError",
@@ -83,12 +123,22 @@ __all__ = [
     "HardwareReserveProfile",
     "HardwareSpec",
     "IncompleteBackendProfileError",
+    "IncompleteRequirementError",
     "InferenceConfig",
+    "InternalFeasibilityStatus",
+    "InvalidMemoryEstimateError",
     "InvalidModelConfigError",
     "KVCacheEstimate",
     "KVCacheFormulaInputs",
     "KVScopeError",
+    "MemoryAggregationError",
+    "MemoryAggregationResult",
+    "MemoryComponentRequirement",
+    "MemoryConstraint",
     "MemoryEstimate",
+    "MemoryFeasibilityReport",
+    "MemoryTopology",
+    "MissingMemoryComponentError",
     "ModelConfigConflictError",
     "ModelConfigParseError",
     "ModelSourceNotFoundError",
@@ -96,6 +146,7 @@ __all__ = [
     "ModelSource",
     "OfflineCacheMissError",
     "OptionalDependencyMissingError",
+    "ProductFeasibilityStatus",
     "ProfileValidationError",
     "RatioRange",
     "RegistryValidationError",
@@ -106,12 +157,17 @@ __all__ = [
     "RuntimeOverheadEstimate",
     "RuntimeOverheadInputError",
     "RuntimeOverheadOverrides",
+    "SignedByteRange",
     "UnsupportedArchitectureError",
     "UnsupportedMemoryTopologyError",
     "WeightArtifactSummary",
     "WeightEstimationMethod",
     "WeightMemoryEstimate",
+    "aggregate_memory_requirements",
+    "analyze_memory_constraints",
+    "assess_memory_feasibility",
     "calculate_kv_cache",
+    "evaluate_memory_feasibility",
     "estimate_hardware_memory_budget",
     "estimate_kv_cache",
     "estimate_runtime_overhead",
@@ -119,4 +175,7 @@ __all__ = [
     "resolve_backend_profile",
     "resolve_hardware_profile",
     "resolve_model",
+    "subtract_byte_ranges",
+    "subtract_exact_bytes_from_range",
+    "subtract_range_from_exact_bytes",
 ]

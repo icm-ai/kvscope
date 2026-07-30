@@ -5,10 +5,12 @@ from typing import Annotated
 
 from pydantic import Field, StrictStr
 
+from kvscope.domain.aggregation import MemoryAggregationResult
 from kvscope.domain.backend import BackendSpec
 from kvscope.domain.base import DomainModel
 from kvscope.domain.config import InferenceConfig
 from kvscope.domain.constraint import Constraint
+from kvscope.domain.constraints import ConstraintAnalysis
 from kvscope.domain.estimate import MemoryEstimate
 from kvscope.domain.evidence import Evidence
 from kvscope.domain.feasibility import FeasibilityResult
@@ -34,3 +36,12 @@ class AnalysisReport(DomainModel):
     recommendations: list[Recommendation] = Field(default_factory=list)
     warnings: list[StrictStr] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
+
+
+class MemoryFeasibilityReport(DomainModel):
+    """Combined Phase 7 report containing aggregation, feasibility, and constraints."""
+
+    schema_version: StrictStr = "v0.1"
+    aggregation: MemoryAggregationResult
+    feasibility: FeasibilityResult
+    constraint_analysis: ConstraintAnalysis

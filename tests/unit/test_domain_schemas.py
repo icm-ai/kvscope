@@ -12,7 +12,9 @@ from kvscope.domain.dtypes import KVDType, WeightDType
 from kvscope.domain.enums import (
     Confidence,
     FeasibilityStatus,
+    InternalFeasibilityStatus,
     MemoryTopology,
+    ProductFeasibilityStatus,
     RiskLevel,
 )
 from kvscope.domain.estimate import EstimateComponent, MemoryEstimate
@@ -20,6 +22,7 @@ from kvscope.domain.evidence import Evidence
 from kvscope.domain.feasibility import FeasibilityResult
 from kvscope.domain.hardware import HardwareSpec
 from kvscope.domain.model import ModelSpec
+from kvscope.domain.ranges import ByteRange
 from kvscope.domain.recommendation import Recommendation
 from kvscope.domain.report import AnalysisReport
 
@@ -224,12 +227,16 @@ def test_report_composes_all_phase_one_schemas() -> None:
         ),
         estimate=estimate(),
         feasibility=FeasibilityResult(
-            status=FeasibilityStatus.FEASIBLE,
-            risk=RiskLevel.LOW,
-            required_bytes=2800,
-            available_bytes=4000,
-            headroom_bytes=1200,
-            headroom_ratio=0.42857142857142855,
+            schema_version="v0.1",
+            internal_status=InternalFeasibilityStatus.GUARANTEED_FEASIBLE,
+            product_status=ProductFeasibilityStatus.FEASIBLE,
+            known_subtotal=ByteRange.exact(2800),
+            physical_total_bytes=4000,
+            allocatable_before_headroom=ByteRange.exact(3500),
+            recommended_allocatable=ByteRange.exact(3000),
+            confidence=Confidence.HIGH,
+            is_actionable=True,
+            explanation="Feasible",
         ),
         constraints=[
             Constraint(
@@ -263,7 +270,7 @@ def test_report_composes_all_phase_one_schemas() -> None:
     )
 
     dumped = report.model_dump(mode="json")
-    assert dumped["feasibility"]["status"] == "feasible"
+    assert dumped["feasibility"]["product_status"] == "feasible"
     assert dumped["config"]["weight_dtype"] == "int4"
     assert report.model_config["frozen"] is True
 

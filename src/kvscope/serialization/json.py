@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from kvscope.domain.memory_budget import HardwareMemoryBudget
+from kvscope.domain.report import MemoryFeasibilityReport
 from kvscope.domain.runtime_overhead import RuntimeOverheadEstimate
 
 
@@ -29,4 +30,13 @@ def serialize_overhead_to_json(
     """Serialize RuntimeOverheadEstimate to a JSON string."""
     data = _dump_model(estimate)
     data["kind"] = "runtime_overhead_estimate"
+    return json.dumps(data, ensure_ascii=False, indent=indent)
+
+
+def serialize_feasibility_report_json(
+    report: MemoryFeasibilityReport, indent: int = 2
+) -> str:
+    """Serialize MemoryFeasibilityReport to a JSON string."""
+    data = _dump_model(report)
+    data["kind"] = "memory_feasibility_report"
     return json.dumps(data, ensure_ascii=False, indent=indent)

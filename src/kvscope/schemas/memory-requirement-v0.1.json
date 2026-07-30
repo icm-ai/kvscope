@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MemoryRequirementResult",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "resident_weights",
+    "kv_cache",
+    "runtime_overhead",
+    "known_subtotal",
+    "is_partial",
+    "missing_components",
+    "confidence"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "resident_weights": { "$ref": "#/$defs/ComponentRequirement" },
+    "kv_cache": { "$ref": "#/$defs/ComponentRequirement" },
+    "runtime_overhead": { "$ref": "#/$defs/ComponentRequirement" },
+    "known_subtotal": { "$ref": "#/$defs/ByteRange" },
+    "total_requirement": {
+      "oneOf": [
+        { "$ref": "#/$defs/ByteRange" },
+        { "type": "null" }
+      ]
+    },
+    "is_partial": { "type": "boolean" },
+    "missing_components": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "dominant_component_expected": {
+      "type": ["string", "null"]
+    },
+    "dominant_component_upper": {
+      "type": ["string", "null"]
+    },
+    "confidence": { "type": "string" },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "ByteRange": {
+      "type": "object",
+      "required": ["lower_bytes", "expected_bytes", "upper_bytes"],
+      "properties": {
+        "lower_bytes": { "type": "integer", "minimum": 0 },
+        "expected_bytes": { "type": "integer", "minimum": 0 },
+        "upper_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ComponentRequirement": {
+      "type": "object",
+      "required": ["component", "memory", "confidence"],
+      "properties": {
+        "component": { "type": "string" },
+        "memory": { "$ref": "#/$defs/ByteRange" },
+        "confidence": { "type": "string" }
+      }
+    }
+  }
+}

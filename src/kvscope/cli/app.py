@@ -3,27 +3,38 @@
 import argparse
 import sys
 from collections.abc import Sequence
+from pathlib import Path
+
+from pydantic import TypeAdapter
 
 from kvscope import __version__
 from kvscope.api import (
+    KVCacheEstimate,
+    WeightMemoryEstimate,
+    assess_memory_feasibility,
     estimate_hardware_memory_budget,
     estimate_runtime_overhead,
     resolve_backend_profile,
     resolve_hardware_profile,
     resolve_model,
 )
+from kvscope.domain.memory_budget import HardwareMemoryBudget
+from kvscope.domain.runtime_overhead import RuntimeOverheadEstimate
 from kvscope.registries.backends import get_default_backend_registry
 from kvscope.registries.hardware import get_default_hardware_registry
 from kvscope.serialization.json import (
     serialize_budget_to_json,
+    serialize_feasibility_report_json,
     serialize_overhead_to_json,
 )
 from kvscope.serialization.markdown import (
     serialize_budget_to_markdown,
+    serialize_feasibility_report_markdown,
     serialize_overhead_to_markdown,
 )
 from kvscope.serialization.terminal import (
     format_budget_terminal,
+    format_feasibility_report_terminal,
     format_overhead_terminal,
 )
 
@@ -139,6 +150,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="Allow unverified or template profiles",
     )
     overhead_parser.add_argument(
+        "--format", choices=("terminal", "json", "markdown"), default="terminal"
+    )
+
+    # Assess memory subcommand
+    assess_parser = subparsers.add_parser(
+        "assess-memory", help="Assess total memory feasibility and constraints"
+    )
+    assess_parser.add_argument(
+        "--weights-json", required=True, help="Path to WeightMemoryEstimate JSON file"
+    )
+    assess_parser.add_argument(
+        "--kv-cache-json", required=True, help="Path to KVCacheEstimate JSON file"
+    )
+    assess_parser.add_argument(
+        "--runtime-overhead-json",
+        required=True,
+        help="Path to RuntimeOverheadEstimate JSON file",
+    )
+    assess_parser.add_argument(
+        "--hardware-budget-json",
+        required=True,
+        help="Path to HardwareMemoryBudget JSON file",
+    )
+    assess_parser.add_argument(
         "--format", choices=("terminal", "json", "markdown"), default="terminal"
     )
 
@@ -275,6 +310,41 @@ def _handle_estimate_overhead(parsed: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_assess_memory(parsed: argparse.Namespace) -> int:
+    weights_path = Path(parsed.weights_json)
+    kv_path = Path(parsed.kv_cache_json)
+    overhead_path = Path(parsed.runtime_overhead_json)
+    budget_path = Path(parsed.hardware_budget_json)
+
+    weights_estimate = TypeAdapter(WeightMemoryEstimate).validate_json(
+        weights_path.read_text(encoding="utf-8")
+    )
+    kv_estimate = TypeAdapter(KVCacheEstimate).validate_json(
+        kv_path.read_text(encoding="utf-8")
+    )
+    overhead_estimate = TypeAdapter(RuntimeOverheadEstimate).validate_json(
+        overhead_path.read_text(encoding="utf-8")
+    )
+    budget_estimate = TypeAdapter(HardwareMemoryBudget).validate_json(
+        budget_path.read_text(encoding="utf-8")
+    )
+
+    report = assess_memory_feasibility(
+        weights=weights_estimate,
+        kv_cache=kv_estimate,
+        runtime_overhead=overhead_estimate,
+        hardware_budget=budget_estimate,
+    )
+
+    if parsed.format == "json":
+        print(serialize_feasibility_report_json(report))
+    elif parsed.format == "markdown":
+        print(serialize_feasibility_report_markdown(report))
+    else:
+        print(format_feasibility_report_terminal(report))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI and return a process exit code."""
     arguments = list(sys.argv[1:] if argv is None else argv)
@@ -295,6 +365,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _handle_backend(parsed)
     elif parsed.subcommand == "estimate-overhead":
         return _handle_estimate_overhead(parsed)
+    elif parsed.subcommand == "assess-memory":
+        return _handle_assess_memory(parsed)
     else:
         # Backward compatibility for direct argument invocation
         if len(arguments) >= 2 and arguments[0] == "inspect-model":

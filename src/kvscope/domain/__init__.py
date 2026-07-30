@@ -1,13 +1,25 @@
 """Stable domain model namespace for KVScope."""
 
+from kvscope.domain.aggregation import (
+    MemoryAggregationResult,
+    MemoryComponentRequirement,
+)
 from kvscope.domain.backend import BackendMemoryModel, BackendProfile, BackendSpec
 from kvscope.domain.config import InferenceConfig
 from kvscope.domain.constraint import Constraint
+from kvscope.domain.constraints import (
+    ConstraintAnalysis,
+    ConstraintPolicy,
+    ConstraintSeverity,
+    MemoryConstraint,
+)
 from kvscope.domain.dtypes import KVDType, WeightDType
 from kvscope.domain.enums import (
     Confidence,
     FeasibilityStatus,
+    InternalFeasibilityStatus,
     MemoryTopology,
+    ProductFeasibilityStatus,
     ProfileStatus,
     RiskLevel,
 )
@@ -32,10 +44,16 @@ from kvscope.domain.ranges import (
     multiply_bytes_by_ratio_range,
 )
 from kvscope.domain.recommendation import Recommendation
-from kvscope.domain.report import AnalysisReport
+from kvscope.domain.report import AnalysisReport, MemoryFeasibilityReport
 from kvscope.domain.runtime_overhead import (
     RuntimeOverheadEstimate,
     RuntimeOverheadOverrides,
+)
+from kvscope.domain.signed_ranges import (
+    SignedByteRange,
+    subtract_byte_ranges,
+    subtract_exact_bytes_from_range,
+    subtract_range_from_exact_bytes,
 )
 from kvscope.domain.units import (
     BYTES_PER_GIB,
@@ -57,6 +75,9 @@ __all__ = [
     "BYTES_PER_MIB",
     "Confidence",
     "Constraint",
+    "ConstraintAnalysis",
+    "ConstraintPolicy",
+    "ConstraintSeverity",
     "EstimateComponent",
     "Evidence",
     "FeasibilityResult",
@@ -66,12 +87,18 @@ __all__ = [
     "HardwareReserveProfile",
     "HardwareSpec",
     "InferenceConfig",
+    "InternalFeasibilityStatus",
     "KVDType",
+    "MemoryAggregationResult",
+    "MemoryComponentRequirement",
     "MemoryEstimate",
+    "MemoryFeasibilityReport",
+    "MemoryConstraint",
     "MemoryQuantityInput",
     "MemoryTopology",
     "ModelSpec",
     "ModelSource",
+    "ProductFeasibilityStatus",
     "ProfileStatus",
     "RatioRange",
     "ResolvedModel",
@@ -80,6 +107,7 @@ __all__ = [
     "RiskLevel",
     "RuntimeOverheadEstimate",
     "RuntimeOverheadOverrides",
+    "SignedByteRange",
     "WeightDType",
     "WeightArtifactSummary",
     "add_byte_ranges",
@@ -90,4 +118,7 @@ __all__ = [
     "gib_to_bytes",
     "mib_to_bytes",
     "multiply_bytes_by_ratio_range",
+    "subtract_byte_ranges",
+    "subtract_exact_bytes_from_range",
+    "subtract_range_from_exact_bytes",
 ]

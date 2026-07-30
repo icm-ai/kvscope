@@ -1,30 +1,50 @@
-"""Feasibility result domain object."""
+"""Feasibility evaluation result domain object."""
 
+from decimal import Decimal
 from typing import Annotated
 
-from pydantic import Field, StrictFloat, StrictInt, model_validator
+from pydantic import Field, StrictInt, StrictStr
 
 from kvscope.domain.base import DomainModel
-from kvscope.domain.enums import FeasibilityStatus, RiskLevel
+from kvscope.domain.enums import (
+    Confidence,
+    InternalFeasibilityStatus,
+    ProductFeasibilityStatus,
+)
+from kvscope.domain.evidence import Evidence
+from kvscope.domain.ranges import ByteRange
+from kvscope.domain.signed_ranges import SignedByteRange
 
 NonNegativeInt = Annotated[StrictInt, Field(ge=0)]
 
 
 class FeasibilityResult(DomainModel):
-    """A decision result without performing the decision calculation."""
+    """Evaluation result comparing memory requirements against hardware budgets."""
 
-    status: FeasibilityStatus
-    risk: RiskLevel
-    required_bytes: NonNegativeInt
-    available_bytes: NonNegativeInt
-    headroom_bytes: StrictInt
-    headroom_ratio: StrictFloat | None = None
+    schema_version: StrictStr = "v0.1"
 
-    @model_validator(mode="after")
-    def validate_headroom(self) -> "FeasibilityResult":
-        """Keep the reported headroom consistent with the two byte totals."""
-        if self.headroom_bytes != self.available_bytes - self.required_bytes:
-            raise ValueError(
-                "headroom_bytes must equal available_bytes - required_bytes"
-            )
-        return self
+    internal_status: InternalFeasibilityStatus
+    product_status: ProductFeasibilityStatus
+
+    requirement: ByteRange | None = None
+    known_subtotal: ByteRange
+
+    physical_total_bytes: NonNegativeInt
+    allocatable_before_headroom: ByteRange
+    recommended_allocatable: ByteRange
+
+    headroom_vs_physical: SignedByteRange | None = None
+    headroom_vs_allocatable: SignedByteRange | None = None
+    headroom_vs_recommended: SignedByteRange | None = None
+
+    expected_headroom_ratio: Decimal | None = None
+
+    confidence: Confidence
+    is_actionable: bool
+
+    primary_boundary: StrictStr | None = None
+    explanation: StrictStr
+
+    assumptions: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    evidence: list[Evidence] = Field(default_factory=list)

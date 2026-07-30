@@ -30,8 +30,29 @@ class ProfileStatus(StrEnum):
     DEPRECATED = "deprecated"
 
 
+class InternalFeasibilityStatus(StrEnum):
+    """Fine-grained internal feasibility evaluation status."""
+
+    GUARANTEED_FEASIBLE = "guaranteed_feasible"
+    EXPECTED_FEASIBLE = "expected_feasible"
+    CONDITIONAL_FEASIBLE = "conditional_feasible"
+    HEADROOM_EXCEEDED = "headroom_exceeded"
+    ALLOCATABLE_EXCEEDED = "allocatable_exceeded"
+    PHYSICAL_MEMORY_EXCEEDED = "physical_memory_exceeded"
+    UNKNOWN = "unknown"
+
+
+class ProductFeasibilityStatus(StrEnum):
+    """User-facing product feasibility status."""
+
+    FEASIBLE = "feasible"
+    TIGHT = "tight"
+    INFEASIBLE = "infeasible"
+    UNKNOWN = "unknown"
+
+
 class FeasibilityStatus(StrEnum):
-    """High-level deployment feasibility status."""
+    """High-level deployment feasibility status (alias to ProductFeasibilityStatus)."""
 
     FEASIBLE = "feasible"
     TIGHT = "tight"
