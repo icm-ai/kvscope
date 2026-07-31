@@ -70,6 +70,33 @@ class BackendProfile(DomainModel):
     confidence: Confidence = Confidence.UNKNOWN
     status: ProfileStatus = ProfileStatus.UNVERIFIED
 
+    def to_spec(self) -> "BackendSpec":
+        """Convert BackendProfile to legacy BackendSpec for calculators."""
+        kv_dtypes: list[KVDType] = []
+        for d in self.supported_kv_dtypes:
+            try:
+                kv_dtypes.append(KVDType(d.lower()))
+            except ValueError:
+                pass
+        return BackendSpec(
+            backend_id=self.backend_id,
+            version_constraint=self.version_specifier,
+            base_overhead_bytes=self.memory_model.base_runtime.expected_bytes,
+            overhead_per_billion_parameters_bytes=self.memory_model.per_billion_parameters.expected_bytes,
+            graph_capture_reserve_bytes=self.memory_model.graph_capture_reserve.expected_bytes,
+            workspace_ratio=float(
+                self.memory_model.workspace_ratio_of_resident_weights.expected
+            ),
+            allocator_margin_ratio=float(
+                self.memory_model.allocator_margin_ratio_of_subtotal.expected
+            ),
+            kv_block_size=self.memory_model.kv_block_size,
+            supports_kv_dtypes=kv_dtypes,
+            supports_cpu_offload=False,
+            confidence=self.confidence,
+            evidence_ids=[e.evidence_id for e in self.evidence],
+        )
+
 
 class BackendSpec(DomainModel):
     """Describes backend-specific memory reservations (v0.1 legacy spec)."""

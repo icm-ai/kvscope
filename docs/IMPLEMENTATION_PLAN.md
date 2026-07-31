@@ -91,49 +91,30 @@ mypy、pytest 和覆盖率门禁。
 
 本阶段明确未实现 Feasibility 最终判断、Status 判断、Recommendation 引擎、自动硬件探测、自动调优或远程后端连接。
 
-## 后续：Runtime Calibration（未开始）
+## Phase 7：Memory Engine + Aggregation + Feasibility + Constraint Analysis — 已完成
 
 交付内容：
+- Memory Aggregation Engine (`aggregate_memory_requirements`)：聚合 Weight Memory, KV Cache, Runtime Overhead 成为统一模型需求。
+- Feasibility Engine (`evaluate_memory_feasibility`)：基于推荐/分配预算推导 `GUARANTEED_FEASIBLE`, `EXPECTED_FEASIBLE`, `CONDITIONAL_FEASIBLE`, `HEADROOM_EXCEEDED`, `ALLOCATABLE_EXCEEDED`, `PHYSICAL_MEMORY_EXCEEDED` 内部状态与 `FEASIBLE`, `TIGHT`, `INFEASIBLE` 产品状态。
+- Constraint Analysis Engine (`analyze_memory_constraints`)：根据 12 种结构化 Constraint Code 分析内存瓶颈与风险。
+- `assess_memory_feasibility` 高层入口，JSON / Terminal / Markdown 序列化，`kvscope assess-memory` CLI。
 
-- 导入 measured peak、backend/hardware/version 元数据；
-- estimated 与 measured 的误差分析；
-- 后端 profile 校准系数和置信度更新；
-- 校准报告和脱敏校验。
-
-独立验收：至少一组实测数据可重放，报告明确区分 theoretical、calibrated
-和 measured，不把经验值伪装成精确公式。
-
-## 后续：Multimodal and MoE（未开始）
+## Phase 8：Recommendation Engine 与安全参数反推 — 已完成
 
 交付内容：
-
-- 视觉 token 和 vision encoder 预算；
-- MoE 总参数、激活参数和 KV Cache 分析；
-- DeepSeek 专项配置与 golden tests。
-
-独立验收：多模态 token 和 MoE 配置的增量内存影响可追溯，缺失数据时输出
-区间或 unknown。
-
-## 后续：Interactive Web（未开始）
-
-交付内容：
-
-- 静态 Web UI 和内存可视化；
-- 浏览器端离线计算；
-- 分享配置与 JSON schema 版本管理；
-- 跨语言 golden tests。
-
-独立验收：核心库不依赖 Web，浏览器交互结果与 Python reference 实现一致。
+- Recommendation Eligibility Engine (`determine_recommendation_eligibility`)：结构化判定 ELIGIBLE, ADVISORY_ONLY, INELIGIBLE。
+- Safe Parameter Back-solving Engines (`find_safe_context_limits`, `find_safe_active_sequence_limits`)：反推 recommended allocatable, allocatable ceiling 目标下的最大 context 与 active sequences，并经过 forward engine 二次验证。
+- Counterfactual Candidate Generators & Evaluation (`generate_candidate_proposals`, `evaluate_candidate_proposal`)：重算 KV/Weight/Runtime 单组件，计算 SignedByteRange 内存节省量，确定 Strength & Verification Status。
+- Deterministic Ranking Engine (`rank_recommendation_candidates`)：无浮点/随机数的 10 元组多键确定性排序。
+- Top-level `generate_recommendations` API，`kvscope recommend` CLI，`recommendation-report-v0.1.json` JSON schema，8 个 Golden Cases A-H，Unit 与 Hypothesis Property-based 测试。
 
 ## 阶段依赖
 
 ```text
 Phase 0
   ↓
-Phase 1 ──→ Phase 2 ──→ Phase 3 ──→ Phase 4 (Weight Engine)
-                                  └──→ 后续 Runtime Calibration
-                                      └──→ 后续 Multimodal/MoE
-                                          └──→ 后续 Interactive Web
+Phase 1 ──→ Phase 2 ──→ Phase 4 (Weight Engine) ──→ Phase 5 (Model Resolver)
+                                                         ↓
+Phase 8 (Recommendation Engine) ←── Phase 7 (Memory Engine) ←── Phase 6 (Hardware & Overhead)
 ```
 
-下一阶段建议在 Phase 4 完成后再单独规划 Model Resolver；本次交付不进入该阶段。

@@ -106,3 +106,16 @@ def subtract_range_from_exact_bytes(
         expected_bytes=expected,
         upper_bytes=upper,
     )
+
+
+def calculate_memory_savings(
+    before: ByteRange,
+    after: ByteRange,
+) -> SignedByteRange:
+    """Calculate the memory savings interval resulting from a configuration change.
+
+    savings.lower = before.lower - after.upper
+    savings.expected = before.expected - after.expected
+    savings.upper = before.upper - after.lower
+    """
+    return subtract_byte_ranges(before, after)

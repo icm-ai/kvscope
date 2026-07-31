@@ -2,6 +2,7 @@
 
 from kvscope.domain.memory_budget import HardwareMemoryBudget
 from kvscope.domain.ranges import ByteRange
+from kvscope.domain.recommendation import RecommendationReport
 from kvscope.domain.report import MemoryFeasibilityReport
 from kvscope.domain.runtime_overhead import RuntimeOverheadEstimate
 from kvscope.domain.signed_ranges import SignedByteRange
@@ -31,9 +32,9 @@ def _row(name: str, br: ByteRange, is_bold: bool = False) -> str:
 
 
 def _sbr_row(name: str, sbr: SignedByteRange) -> str:
-    l_g = bytes_to_gib(sbr.lower_bytes)
-    e_g = bytes_to_gib(sbr.expected_bytes)
-    u_g = bytes_to_gib(sbr.upper_bytes)
+    l_g = float(sbr.lower_bytes) / (1024**3)
+    e_g = float(sbr.expected_bytes) / (1024**3)
+    u_g = float(sbr.upper_bytes) / (1024**3)
     exp_b = sbr.expected_bytes
     return f"| {name} | {l_g:.2f} | {e_g:.2f} | {u_g:.2f} | `{exp_b}` |"
 
@@ -242,3 +243,176 @@ def serialize_feasibility_report_markdown(report: MemoryFeasibilityReport) -> st
             )
 
     return "\n".join(lines)
+
+
+def format_recommendation_report_markdown(report: RecommendationReport) -> str:
+    """Serialize a RecommendationReport to Markdown format."""
+    prod_st = report.baseline_report.feasibility.product_status.value
+    int_st = report.baseline_report.feasibility.internal_status.value
+    lines: list[str] = [
+        "# KVScope Recommendation Report",
+        "",
+        "## Baseline Assessment",
+        "",
+        f"- **Eligibility**: `{report.eligibility.eligibility.value}`",
+        f"- **Baseline Product Feasibility**: `{prod_st}`",
+        f"- **Baseline Internal Feasibility**: `{int_st}`",
+        f"- **Baseline Confidence**: `{report.eligibility.confidence.value}`",
+        "",
+    ]
+
+    p = report.primary_recommendation
+    if p is not None:
+        lines.extend(
+            [
+                "## Primary Recommendation",
+                "",
+                f"### {p.title}",
+                "",
+                f"- **Action**: `{p.action.value}`",
+                f"- **Strength**: `{p.strength.value}`",
+                f"- **Confidence**: `{p.confidence.value}`",
+                f"- **Tradeoff Severity**: `{p.tradeoff_severity.value}`",
+                "",
+                p.explanation,
+                "",
+            ]
+        )
+        if p.changes:
+            lines.extend(
+                [
+                    "#### Parameter Changes",
+                    "",
+                    "| Parameter | Before | After | Unit |",
+                    "| :--- | :--- | :--- | :--- |",
+                ]
+            )
+            for chg in p.changes:
+                u_str = chg.unit or "N/A"
+                p_str = chg.parameter
+                lines.append(
+                    f"| `{p_str}` | `{chg.before}` | `{chg.after}` | `{u_str}` |"
+                )
+
+            lines.append("")
+
+        if p.impact is not None:
+            b_st = p.impact.before_status.value
+            a_st = p.impact.after_status.value
+            hdr = (
+                "| Metric | Lower (GiB) | Expected (GiB) | Upper (GiB) | "
+                "Bytes (Expected) |"
+            )
+            lines.extend(
+                [
+                    "#### Memory Impact Breakdown",
+                    "",
+                    hdr,
+                    "| :--- | :--- | :--- | :--- | :--- |",
+                    _sbr_row("Expected Savings", p.impact.savings),
+                    _row("Baseline Requirement", p.impact.before_requirement),
+                    _row("Candidate Requirement", p.impact.after_requirement),
+                    _sbr_row(
+                        "Baseline Headroom (Recommended)",
+                        p.impact.before_headroom_recommended,
+                    ),
+                    _sbr_row(
+                        "Candidate Headroom (Recommended)",
+                        p.impact.after_headroom_recommended,
+                    ),
+                    "",
+                    f"- **Before Feasibility Status**: `{b_st}`",
+                    f"- **After Feasibility Status**: `{a_st}`",
+                    "",
+                ]
+            )
+        if p.tradeoffs:
+            lines.extend(["#### Operational Tradeoffs", ""])
+            for t in p.tradeoffs:
+                lines.append(f"- {t}")
+            lines.append("")
+
+    if report.safe_limits is not None:
+        lines.extend(["## Safe Parameter Capacity Limits", ""])
+        c_lim = report.safe_limits.context
+        if c_lim is not None:
+            g_c = (
+                f"`{c_lim.guaranteed_safe_max_context}` tokens"
+                if c_lim.guaranteed_safe_max_context
+                else "N/A"
+            )
+            e_c = (
+                f"`{c_lim.expected_safe_max_context}` tokens"
+                if c_lim.expected_safe_max_context
+                else "N/A"
+            )
+            a_c = (
+                f"`{c_lim.allocatable_ceiling_max_context}` tokens"
+                if c_lim.allocatable_ceiling_max_context
+                else "N/A"
+            )
+            lines.extend(
+                [
+                    "### Context Length Capacity",
+                    f"- **Current Context**: `{c_lim.current_context}` tokens",
+                    f"- **Guaranteed Safe Maximum**: {g_c}",
+                    f"- **Expected Safe Maximum**: {e_c}",
+                    f"- **Allocatable Ceiling Maximum**: {a_c}",
+                    "",
+                ]
+            )
+
+        s_lim = report.safe_limits.active_sequences
+        if s_lim is not None:
+            g_s = (
+                f"`{s_lim.guaranteed_safe_max_sequences}`"
+                if s_lim.guaranteed_safe_max_sequences
+                else "N/A"
+            )
+            e_s = (
+                f"`{s_lim.expected_safe_max_sequences}`"
+                if s_lim.expected_safe_max_sequences
+                else "N/A"
+            )
+            a_s = (
+                f"`{s_lim.allocatable_ceiling_max_sequences}`"
+                if s_lim.allocatable_ceiling_max_sequences
+                else "N/A"
+            )
+            curr_seqs = s_lim.current_active_sequences
+            lines.extend(
+                [
+                    "### Active Sequence Capacity",
+                    f"- **Current Active Sequences**: `{curr_seqs}`",
+                    f"- **Guaranteed Safe Maximum**: {g_s}",
+                    f"- **Expected Safe Maximum**: {e_s}",
+                    f"- **Allocatable Ceiling Maximum**: {a_s}",
+                    "",
+                ]
+            )
+
+    if report.alternatives:
+        lines.extend(
+            [
+                "## Alternative Recommendations",
+                "",
+                "| Action | Strength | Title | Tradeoff Severity |",
+                "| :--- | :--- | :--- | :--- |",
+            ]
+        )
+        for alt in report.alternatives:
+            act_v = alt.action.value
+            str_v = alt.strength.value
+            trd_v = alt.tradeoff_severity.value
+            lines.append(f"| `{act_v}` | `{str_v}` | {alt.title} | `{trd_v}` |")
+        lines.append("")
+
+    if report.warnings:
+        lines.extend(["### Warnings", ""])
+        for w in report.warnings:
+            lines.append(f"> [!WARNING]\n> {w}")
+
+    return "\n".join(lines)
+
+
+serialize_recommendation_report_markdown = format_recommendation_report_markdown

@@ -167,3 +167,27 @@ class IncompleteRequirementError(FeasibilityEvaluationError):
 
 class ConstraintAnalysisError(KVScopeError):
     """Base exception for constraint analysis errors."""
+
+
+class RecommendationError(KVScopeError):
+    """Base exception for recommendation engine errors."""
+
+
+class RecommendationIneligibleError(RecommendationError):
+    """Raised when recommendations are requested for an ineligible baseline."""
+
+
+class RecommendationContextError(RecommendationError):
+    """Raised when recommendation context or inputs are invalid or inconsistent."""
+
+
+class SafeLimitCalculationError(RecommendationError):
+    """Raised when safe parameter back-solving encounters an error."""
+
+
+class CandidateEvaluationError(RecommendationError):
+    """Raised when candidate evaluation fails."""
+
+
+class UnsupportedRecommendationActionError(RecommendationError):
+    """Raised when an unsupported recommendation action is requested."""

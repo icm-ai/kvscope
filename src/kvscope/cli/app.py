@@ -10,15 +10,22 @@ from pydantic import TypeAdapter
 from kvscope import __version__
 from kvscope.api import (
     KVCacheEstimate,
+    RecommendationBudgetTarget,
+    RecommendationContext,
+    RecommendationEligibility,
+    RecommendationPolicy,
+    RecommendationSafetyLevel,
     WeightMemoryEstimate,
     assess_memory_feasibility,
     estimate_hardware_memory_budget,
     estimate_runtime_overhead,
+    generate_recommendations,
     resolve_backend_profile,
     resolve_hardware_profile,
     resolve_model,
 )
 from kvscope.domain.memory_budget import HardwareMemoryBudget
+from kvscope.domain.report import MemoryFeasibilityReport
 from kvscope.domain.runtime_overhead import RuntimeOverheadEstimate
 from kvscope.registries.backends import get_default_backend_registry
 from kvscope.registries.hardware import get_default_hardware_registry
@@ -26,16 +33,19 @@ from kvscope.serialization.json import (
     serialize_budget_to_json,
     serialize_feasibility_report_json,
     serialize_overhead_to_json,
+    serialize_recommendation_report_json,
 )
 from kvscope.serialization.markdown import (
     serialize_budget_to_markdown,
     serialize_feasibility_report_markdown,
     serialize_overhead_to_markdown,
+    serialize_recommendation_report_markdown,
 )
 from kvscope.serialization.terminal import (
     format_budget_terminal,
     format_feasibility_report_terminal,
     format_overhead_terminal,
+    format_recommendation_report_terminal,
 )
 
 
@@ -174,6 +184,45 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to HardwareMemoryBudget JSON file",
     )
     assess_parser.add_argument(
+        "--format", choices=("terminal", "json", "markdown"), default="terminal"
+    )
+
+    # Recommend subcommand
+
+    rec_parser = subparsers.add_parser(
+        "recommend", help="Generate recommendations and safe parameter limits"
+    )
+    rec_parser.add_argument(
+        "--context-json", required=True, help="Path to RecommendationContext JSON"
+    )
+    rec_parser.add_argument(
+        "--baseline-report-json",
+        required=True,
+        help="Path to MemoryFeasibilityReport JSON",
+    )
+    rec_parser.add_argument(
+        "--target-budget",
+        choices=("recommended", "allocatable_ceiling", "physical_total"),
+        default="recommended",
+    )
+    rec_parser.add_argument(
+        "--safety-level",
+        choices=("guaranteed_safe", "expected_safe"),
+        default="expected_safe",
+    )
+    rec_parser.add_argument("--max-candidates", type=int, default=5)
+    rec_parser.add_argument(
+        "--allow-weight-dtype-change", action="store_true", default=True
+    )
+    rec_parser.add_argument(
+        "--allow-kv-dtype-change", action="store_true", default=True
+    )
+    rec_parser.add_argument(
+        "--allow-disable-graph-capture", action="store_true", default=True
+    )
+    rec_parser.add_argument("--minimum-context", type=int, default=None)
+    rec_parser.add_argument("--minimum-active-sequences", type=int, default=None)
+    rec_parser.add_argument(
         "--format", choices=("terminal", "json", "markdown"), default="terminal"
     )
 
@@ -345,6 +394,78 @@ def _handle_assess_memory(parsed: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_recommend(parsed: argparse.Namespace) -> int:
+    try:
+        ctx_path = Path(parsed.context_json)
+        report_path = Path(parsed.baseline_report_json)
+
+        if not ctx_path.exists() or not report_path.exists():
+            print(
+                "Error: Context or baseline report JSON file not found.",
+                file=sys.stderr,
+            )
+            return 5
+
+        rec_ctx = TypeAdapter(RecommendationContext).validate_json(
+            ctx_path.read_text(encoding="utf-8")
+        )
+        baseline_report = TypeAdapter(MemoryFeasibilityReport).validate_json(
+            report_path.read_text(encoding="utf-8")
+        )
+
+        if (
+            parsed.minimum_context is not None
+            or parsed.minimum_active_sequences is not None
+        ):
+            new_wc_dict = {}
+            if parsed.minimum_context is not None:
+                new_wc_dict["minimum_context_length"] = parsed.minimum_context
+            if parsed.minimum_active_sequences is not None:
+                new_wc_dict["minimum_active_sequences"] = (
+                    parsed.minimum_active_sequences
+                )
+            updated_wc = rec_ctx.workload_constraints.model_copy(update=new_wc_dict)
+            rec_ctx = rec_ctx.model_copy(update={"workload_constraints": updated_wc})
+
+        policy = RecommendationPolicy(
+            target_budget=RecommendationBudgetTarget(parsed.target_budget),
+            target_safety_level=RecommendationSafetyLevel(parsed.safety_level),
+            maximum_candidates=parsed.max_candidates,
+            allow_weight_dtype_change=parsed.allow_weight_dtype_change,
+            allow_kv_dtype_change=parsed.allow_kv_dtype_change,
+            allow_disable_graph_capture=parsed.allow_disable_graph_capture,
+        )
+
+        rec_report = generate_recommendations(
+            context=rec_ctx,
+            baseline_report=baseline_report,
+            policy=policy,
+        )
+
+        if parsed.format == "json":
+            print(serialize_recommendation_report_json(rec_report))
+        elif parsed.format == "markdown":
+            print(serialize_recommendation_report_markdown(rec_report))
+        else:
+            print(format_recommendation_report_terminal(rec_report))
+
+        if rec_report.eligibility.eligibility == RecommendationEligibility.INELIGIBLE:
+            return 4
+        if (
+            rec_report.eligibility.eligibility
+            == RecommendationEligibility.ADVISORY_ONLY
+        ):
+            return 2
+        if rec_report.primary_recommendation is None:
+            return 3
+
+        return 0
+
+    except Exception as exc:
+        print(f"Internal error generating recommendations: {exc}", file=sys.stderr)
+        return 10
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI and return a process exit code."""
     arguments = list(sys.argv[1:] if argv is None else argv)
@@ -367,6 +488,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _handle_estimate_overhead(parsed)
     elif parsed.subcommand == "assess-memory":
         return _handle_assess_memory(parsed)
+    elif parsed.subcommand == "recommend":
+        return _handle_recommend(parsed)
     else:
         # Backward compatibility for direct argument invocation
         if len(arguments) >= 2 and arguments[0] == "inspect-model":

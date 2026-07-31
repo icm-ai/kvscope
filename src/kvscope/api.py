@@ -26,6 +26,7 @@ from kvscope.domain.constraints import (
     ConstraintSeverity,
     MemoryConstraint,
 )
+from kvscope.domain.dtypes import KVDType, WeightDType
 from kvscope.domain.enums import (
     Confidence,
     FeasibilityStatus,
@@ -44,6 +45,27 @@ from kvscope.domain.memory_budget import HardwareMemoryBudget
 from kvscope.domain.model import ModelSpec
 from kvscope.domain.model_source import ModelSource, ResolvedModel, ResolverAttempt
 from kvscope.domain.ranges import ByteRange, RatioRange
+from kvscope.domain.recommendation import (
+    ActiveSequenceLimitResult,
+    CandidateMemoryImpact,
+    CandidateVerificationStatus,
+    ContextLimitResult,
+    ParameterChange,
+    RecommendationAction,
+    RecommendationBudgetTarget,
+    RecommendationCandidate,
+    RecommendationContext,
+    RecommendationEligibility,
+    RecommendationEligibilityResult,
+    RecommendationPolicy,
+    RecommendationReport,
+    RecommendationSafetyLevel,
+    RecommendationStrength,
+    RejectedRecommendationCandidate,
+    SafeParameterLimits,
+    TradeoffSeverity,
+    WorkloadConstraints,
+)
 from kvscope.domain.report import AnalysisReport, MemoryFeasibilityReport
 from kvscope.domain.runtime_overhead import (
     RuntimeOverheadEstimate,
@@ -51,6 +73,7 @@ from kvscope.domain.runtime_overhead import (
 )
 from kvscope.domain.signed_ranges import (
     SignedByteRange,
+    calculate_memory_savings,
     subtract_byte_ranges,
     subtract_exact_bytes_from_range,
     subtract_range_from_exact_bytes,
@@ -59,12 +82,19 @@ from kvscope.domain.weight import WeightArtifactSummary
 from kvscope.engines.aggregation import aggregate_memory_requirements
 from kvscope.engines.analysis import assess_memory_feasibility
 from kvscope.engines.constraints import analyze_memory_constraints
+from kvscope.engines.context_limits import find_safe_context_limits
 from kvscope.engines.feasibility import evaluate_memory_feasibility
+from kvscope.engines.recommendation_eligibility import (
+    determine_recommendation_eligibility,
+)
+from kvscope.engines.recommendations import generate_recommendations
+from kvscope.engines.sequence_limits import find_safe_active_sequence_limits
 from kvscope.errors import (
     BackendProfileAmbiguousError,
     BackendProfileError,
     BackendProfileNotFoundError,
     BackendVersionMismatchError,
+    CandidateEvaluationError,
     ConstraintAnalysisError,
     FeasibilityEvaluationError,
     HardwareProfileConflictError,
@@ -83,10 +113,15 @@ from kvscope.errors import (
     OfflineCacheMissError,
     OptionalDependencyMissingError,
     ProfileValidationError,
+    RecommendationContextError,
+    RecommendationError,
+    RecommendationIneligibleError,
     RegistryValidationError,
     RuntimeOverheadInputError,
+    SafeLimitCalculationError,
     UnsupportedArchitectureError,
     UnsupportedMemoryTopologyError,
+    UnsupportedRecommendationActionError,
 )
 from kvscope.resolvers.backend import ResolvedBackendProfile, resolve_backend_profile
 from kvscope.resolvers.chain import resolve_model
@@ -96,6 +131,7 @@ from kvscope.resolvers.hardware import (
 )
 
 __all__ = [
+    "ActiveSequenceLimitResult",
     "AnalysisReport",
     "AttentionMode",
     "BackendMemoryModel",
@@ -106,11 +142,15 @@ __all__ = [
     "BackendSpec",
     "BackendVersionMismatchError",
     "ByteRange",
+    "CandidateEvaluationError",
+    "CandidateMemoryImpact",
+    "CandidateVerificationStatus",
     "Confidence",
     "ConstraintAnalysis",
     "ConstraintAnalysisError",
     "ConstraintPolicy",
     "ConstraintSeverity",
+    "ContextLimitResult",
     "EstimateComponent",
     "FeasibilityEvaluationError",
     "FeasibilityResult",
@@ -128,6 +168,7 @@ __all__ = [
     "InternalFeasibilityStatus",
     "InvalidMemoryEstimateError",
     "InvalidModelConfigError",
+    "KVDType",
     "KVCacheEstimate",
     "KVCacheFormulaInputs",
     "KVScopeError",
@@ -141,15 +182,30 @@ __all__ = [
     "MissingMemoryComponentError",
     "ModelConfigConflictError",
     "ModelConfigParseError",
+    "ModelSource",
     "ModelSourceNotFoundError",
     "ModelSpec",
-    "ModelSource",
     "OfflineCacheMissError",
     "OptionalDependencyMissingError",
+    "ParameterChange",
     "ProductFeasibilityStatus",
     "ProfileValidationError",
     "RatioRange",
+    "RecommendationAction",
+    "RecommendationBudgetTarget",
+    "RecommendationCandidate",
+    "RecommendationContext",
+    "RecommendationContextError",
+    "RecommendationEligibility",
+    "RecommendationEligibilityResult",
+    "RecommendationError",
+    "RecommendationIneligibleError",
+    "RecommendationPolicy",
+    "RecommendationReport",
+    "RecommendationSafetyLevel",
+    "RecommendationStrength",
     "RegistryValidationError",
+    "RejectedRecommendationCandidate",
     "ResolvedBackendProfile",
     "ResolvedHardwareProfile",
     "ResolvedModel",
@@ -157,21 +213,32 @@ __all__ = [
     "RuntimeOverheadEstimate",
     "RuntimeOverheadInputError",
     "RuntimeOverheadOverrides",
+    "SafeLimitCalculationError",
+    "SafeParameterLimits",
     "SignedByteRange",
+    "TradeoffSeverity",
     "UnsupportedArchitectureError",
     "UnsupportedMemoryTopologyError",
+    "UnsupportedRecommendationActionError",
     "WeightArtifactSummary",
+    "WeightDType",
     "WeightEstimationMethod",
     "WeightMemoryEstimate",
+    "WorkloadConstraints",
     "aggregate_memory_requirements",
     "analyze_memory_constraints",
     "assess_memory_feasibility",
     "calculate_kv_cache",
-    "evaluate_memory_feasibility",
+    "calculate_memory_savings",
+    "determine_recommendation_eligibility",
     "estimate_hardware_memory_budget",
     "estimate_kv_cache",
     "estimate_runtime_overhead",
     "estimate_weight_memory",
+    "evaluate_memory_feasibility",
+    "find_safe_active_sequence_limits",
+    "find_safe_context_limits",
+    "generate_recommendations",
     "resolve_backend_profile",
     "resolve_hardware_profile",
     "resolve_model",

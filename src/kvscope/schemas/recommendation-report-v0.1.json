@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RecommendationReport",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "eligibility",
+    "baseline_report"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "eligibility": {
+      "type": "object",
+      "required": ["eligibility", "reason_codes", "confidence", "warnings"],
+      "properties": {
+        "eligibility": { "type": "string", "enum": ["eligible", "advisory_only", "ineligible"] },
+        "reason_codes": { "type": "array", "items": { "type": "string" } },
+        "confidence": { "type": "string" },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "baseline_report": { "$ref": "feasibility-report-v0.1.json" },
+    "primary_recommendation": {
+      "type": ["object", "null"],
+      "properties": {
+        "candidate_id": { "type": "string" },
+        "action": { "type": "string" },
+        "strength": { "type": "string" },
+        "title": { "type": "string" },
+        "explanation": { "type": "string" },
+        "eligibility": { "type": "string" },
+        "confidence": { "type": "string" }
+      }
+    },
+    "alternatives": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "rejected_candidates": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "safe_limits": {
+      "type": ["object", "null"],
+      "properties": {
+        "context": { "type": ["object", "null"] },
+        "active_sequences": { "type": ["object", "null"] }
+      }
+    },
+    "combined_changes_may_be_required": { "type": "boolean" },
+    "assumptions": { "type": "array", "items": { "type": "string" } },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "evidence": { "type": "array", "items": { "type": "object" } }
+  }
+}

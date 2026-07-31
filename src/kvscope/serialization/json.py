@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from kvscope.domain.memory_budget import HardwareMemoryBudget
+from kvscope.domain.recommendation import RecommendationReport
 from kvscope.domain.report import MemoryFeasibilityReport
 from kvscope.domain.runtime_overhead import RuntimeOverheadEstimate
 
@@ -40,3 +41,15 @@ def serialize_feasibility_report_json(
     data = _dump_model(report)
     data["kind"] = "memory_feasibility_report"
     return json.dumps(data, ensure_ascii=False, indent=indent)
+
+
+def serialize_recommendation_report_json(
+    report: RecommendationReport, indent: int = 2
+) -> str:
+    """Serialize RecommendationReport to a JSON string."""
+    data = _dump_model(report)
+    data["kind"] = "recommendation_report"
+    return json.dumps(data, ensure_ascii=False, indent=indent)
+
+
+format_recommendation_report_json = serialize_recommendation_report_json

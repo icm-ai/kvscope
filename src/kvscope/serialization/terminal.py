@@ -209,3 +209,82 @@ def format_feasibility_report_terminal(report: MemoryFeasibilityReport) -> str:
             lines.append(f"  - [{ev.evidence_id}] {ev.source} (type: {ev.source_type})")
 
     return "\n".join(lines)
+
+
+def format_recommendation_report_terminal(
+    report: MemoryFeasibilityReport | object,
+) -> str:
+    """Render a RecommendationReport as plain text formatted for terminal display."""
+    from kvscope.domain.recommendation import RecommendationReport
+
+    if not isinstance(report, RecommendationReport):
+        return str(report)
+    prod_st = report.baseline_report.feasibility.product_status.value
+    int_st = report.baseline_report.feasibility.internal_status.value
+    lines: list[str] = [
+        "=== KVScope Recommendation Report ===",
+        f"Eligibility:                   {report.eligibility.eligibility.value}",
+        f"Baseline Product Feasibility:  {prod_st}",
+        f"Baseline Internal Feasibility: {int_st}",
+        f"Baseline Confidence:           {report.eligibility.confidence.value}",
+    ]
+
+    p = report.primary_recommendation
+    if p is not None:
+        lines.extend(
+            [
+                "",
+                "--- Primary Recommendation ---",
+                f"Title:             {p.title}",
+                f"Action:            {p.action.value}",
+                f"Strength:          {p.strength.value}",
+                f"Confidence:        {p.confidence.value}",
+                f"Tradeoff Severity: {p.tradeoff_severity.value}",
+                f"Explanation:       {p.explanation}",
+            ]
+        )
+        if p.changes:
+            lines.append("Parameter Changes:")
+            for chg in p.changes:
+                u_str = f" {chg.unit}" if chg.unit else ""
+                lines.append(f"  - {chg.parameter}: {chg.before} -> {chg.after}{u_str}")
+        if p.impact is not None:
+            sav_str = _format_signed_byte_range(p.impact.savings)
+            lines.append(f"Expected Memory Savings: {sav_str}")
+            lines.append(f"After Status:            {p.impact.after_status.value}")
+        if p.tradeoffs:
+            lines.append("Operational Tradeoffs:")
+            for t in p.tradeoffs:
+                lines.append(f"  - {t}")
+
+    if report.safe_limits is not None:
+        lines.extend(["", "--- Safe Parameter Capacity Limits ---"])
+        if report.safe_limits.context is not None:
+            c = report.safe_limits.context
+            g_c = c.guaranteed_safe_max_context or "N/A"
+            e_c = c.expected_safe_max_context or "N/A"
+            lines.append(f"Context Length Current:        {c.current_context} tokens")
+            lines.append(f"Context Length Guaranteed Safe:{g_c}")
+            lines.append(f"Context Length Expected Safe:  {e_c}")
+        if report.safe_limits.active_sequences is not None:
+            s = report.safe_limits.active_sequences
+            g_s = s.guaranteed_safe_max_sequences or "N/A"
+            e_s = s.expected_safe_max_sequences or "N/A"
+            lines.append(f"Active Sequences Current:      {s.current_active_sequences}")
+            lines.append(f"Active Sequences Guaranteed:   {g_s}")
+            lines.append(f"Active Sequences Expected:     {e_s}")
+
+    if report.alternatives:
+        lines.extend(["", "--- Alternative Recommendations ---"])
+        for alt in report.alternatives:
+            lines.append(
+                f"  - [{alt.action.value}] {alt.title} "
+                f"(severity: {alt.tradeoff_severity.value})"
+            )
+
+    if report.warnings:
+        lines.extend(["", "Warnings:"])
+        for w in report.warnings:
+            lines.append(f"  - [WARNING] {w}")
+
+    return "\n".join(lines)
