@@ -1,0 +1,60 @@
+{
+  "schema_version": "0.1",
+  "profile_id": "llama-cpp-generic-unverified-v0",
+  "backend_id": "llama_cpp",
+  "display_name": "llama.cpp Generic Unverified v0",
+  "aliases": ["llama-cpp", "llama.cpp"],
+  "supported_memory_topologies": ["discrete", "unified", "system"],
+  "supported_vendors": ["apple", "nvidia", "generic"],
+  "supported_families": [],
+  "memory_model": {
+    "base_runtime": {
+      "lower_bytes": 33554432,
+      "expected_bytes": 67108864,
+      "upper_bytes": 134217728
+    },
+    "per_billion_parameters": {
+      "lower_bytes": 8388608,
+      "expected_bytes": 16777216,
+      "upper_bytes": 33554432
+    },
+    "workspace_ratio_of_resident_weights": {
+      "lower": "0.01",
+      "expected": "0.03",
+      "upper": "0.05"
+    },
+    "graph_capture_reserve": {
+      "lower_bytes": 0,
+      "expected_bytes": 0,
+      "upper_bytes": 0
+    },
+    "backend_buffers": {
+      "lower_bytes": 16777216,
+      "expected_bytes": 33554432,
+      "upper_bytes": 67108864
+    },
+    "allocator_margin_ratio_of_subtotal": {
+      "lower": "0.01",
+      "expected": "0.02",
+      "upper": "0.05"
+    },
+    "graph_capture_supported": false,
+    "kv_block_size": 1
+  },
+  "supported_weight_dtypes": ["fp16", "int8", "int4"],
+  "supported_kv_dtypes": ["fp16", "int8"],
+  "notes": [
+    "Unverified generic profile using initial documented llama.cpp overhead ranges.",
+    "Use for preliminary planning only; benchmark the target backend version and hardware before deployment."
+  ],
+  "evidence": [
+    {
+      "evidence_id": "llama-cpp-generic-template-ranges",
+      "source_type": "theoretical_spec",
+      "source": "examples/templates/llama-cpp-generic-template.yaml",
+      "notes": "Initial runtime overhead ranges pending target-environment calibration."
+    }
+  ],
+  "confidence": "unknown",
+  "status": "unverified"
+}

@@ -43,11 +43,16 @@ def test_backend_profile_validation() -> None:
 
 
 def test_default_backend_registry() -> None:
+    """Built-in registry exposes the two preliminary, unverified profiles."""
     reg = get_default_backend_registry()
     profiles = reg.list_profiles()
-    assert len(profiles) == 0
+    assert {profile.profile_id for profile in profiles} == {
+        "llama-cpp-generic-unverified-v0",
+        "vllm-generic-unverified-v0",
+    }
+    assert all(profile.status == ProfileStatus.UNVERIFIED for profile in profiles)
     assert reg.get("vllm-generic-template") is None
-    assert reg.get("vllm") is None
+    assert reg.get("vllm") is not None
 
 
 def test_resolve_backend_profile_version_specifier(

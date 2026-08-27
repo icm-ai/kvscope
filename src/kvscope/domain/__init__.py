@@ -64,7 +64,12 @@ from kvscope.domain.recommendation import (
     TradeoffSeverity,
     WorkloadConstraints,
 )
-from kvscope.domain.report import AnalysisReport, MemoryFeasibilityReport
+from kvscope.domain.report import (
+    AnalysisInferenceConfig,
+    AnalysisProvenance,
+    AnalysisReport,
+    MemoryFeasibilityReport,
+)
 from kvscope.domain.runtime_overhead import (
     RuntimeOverheadEstimate,
     RuntimeOverheadOverrides,
@@ -86,6 +91,8 @@ from kvscope.domain.units import (
 from kvscope.domain.weight import WeightArtifactSummary
 
 __all__ = [
+    "AnalysisInferenceConfig",
+    "AnalysisProvenance",
     "AnalysisReport",
     "BackendMemoryModel",
     "BackendProfile",

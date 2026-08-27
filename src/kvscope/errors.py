@@ -5,6 +5,14 @@ class KVScopeError(Exception):
     """Base exception for expected KVScope errors."""
 
 
+class CalibrationLoadError(KVScopeError, ValueError):
+    """A local calibration measurement or feasibility report cannot be loaded."""
+
+    def __init__(self, message: str, *, code: str) -> None:
+        self.code = code
+        super().__init__(message)
+
+
 class ModelResolutionError(KVScopeError):
     """Raised when a model source cannot be resolved."""
 

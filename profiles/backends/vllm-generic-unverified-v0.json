@@ -1,0 +1,61 @@
+{
+  "schema_version": "0.1",
+  "profile_id": "vllm-generic-unverified-v0",
+  "backend_id": "vllm",
+  "display_name": "vLLM Generic Unverified v0",
+  "aliases": ["vllm"],
+  "version_specifier": ">=0.4.0,<1.0.0",
+  "supported_memory_topologies": ["discrete", "unified"],
+  "supported_vendors": ["nvidia", "amd", "generic"],
+  "supported_families": [],
+  "memory_model": {
+    "base_runtime": {
+      "lower_bytes": 268435456,
+      "expected_bytes": 536870912,
+      "upper_bytes": 1073741824
+    },
+    "per_billion_parameters": {
+      "lower_bytes": 33554432,
+      "expected_bytes": 67108864,
+      "upper_bytes": 134217728
+    },
+    "workspace_ratio_of_resident_weights": {
+      "lower": "0.02",
+      "expected": "0.05",
+      "upper": "0.10"
+    },
+    "graph_capture_reserve": {
+      "lower_bytes": 536870912,
+      "expected_bytes": 1073741824,
+      "upper_bytes": 2147483648
+    },
+    "backend_buffers": {
+      "lower_bytes": 67108864,
+      "expected_bytes": 134217728,
+      "upper_bytes": 268435456
+    },
+    "allocator_margin_ratio_of_subtotal": {
+      "lower": "0.03",
+      "expected": "0.05",
+      "upper": "0.08"
+    },
+    "graph_capture_supported": true,
+    "kv_block_size": 16
+  },
+  "supported_weight_dtypes": ["fp16", "bf16", "int8", "int4"],
+  "supported_kv_dtypes": ["fp16", "bf16", "fp8"],
+  "notes": [
+    "Unverified generic profile using initial documented vLLM overhead ranges.",
+    "Use for preliminary planning only; benchmark the target backend version and hardware before deployment."
+  ],
+  "evidence": [
+    {
+      "evidence_id": "vllm-generic-template-ranges",
+      "source_type": "theoretical_spec",
+      "source": "examples/templates/vllm-generic-template.yaml",
+      "notes": "Initial runtime overhead ranges pending target-environment calibration."
+    }
+  ],
+  "confidence": "unknown",
+  "status": "unverified"
+}

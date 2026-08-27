@@ -74,6 +74,18 @@ confidence: unknown
 status: unverified
 ```
 
+## 2.1 Bundled unverified profiles
+
+`profiles/backends/` contains complete but unverified generic profiles for
+vLLM and llama.cpp. They use the initial ranges documented by the matching
+examples, remain explicitly `unverified` with `unknown` confidence, and are
+therefore suitable only for preliminary planning. They are intentionally not
+named or marked as templates, so the Runtime Overhead Engine can produce a
+complete range while retaining the calibration warning.
+
+Do not treat these profiles as measured data or relabel them as `verified`
+without target-version and target-hardware evidence.
+
 ## 3. Resolver 匹配机制与打分
 
 Resolver 根据传入的 `backend_id`、`version` 以及可选的 `hardware`，对候选 Profiles (`profiles/backends/`) 进行评估与打分：

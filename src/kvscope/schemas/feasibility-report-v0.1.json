@@ -10,6 +10,41 @@
   ],
   "properties": {
     "schema_version": { "type": "string" },
+    "provenance": {
+      "type": ["object", "null"],
+      "required": [
+        "model_id",
+        "model_revision",
+        "model_config_digest",
+        "backend_profile_id",
+        "backend_version",
+        "hardware_profile_id",
+        "inference_config"
+      ],
+      "properties": {
+        "model_id": { "type": "string", "minLength": 1 },
+        "model_revision": { "type": ["string", "null"] },
+        "model_config_digest": { "type": ["string", "null"] },
+        "backend_profile_id": { "type": "string", "minLength": 1 },
+        "backend_version": { "type": ["string", "null"] },
+        "hardware_profile_id": { "type": "string", "minLength": 1 },
+        "inference_config": {
+          "type": "object",
+          "required": [
+            "context_length",
+            "batch_size",
+            "max_num_seqs",
+            "active_sequences",
+            "prefix_tokens",
+            "multimodal_tokens",
+            "weight_dtype",
+            "kv_dtype",
+            "graph_capture_enabled",
+            "cpu_offload_bytes"
+          ]
+        }
+      }
+    },
     "aggregation": { "$ref": "memory-requirement-v0.1.json" },
     "feasibility": {
       "type": "object",

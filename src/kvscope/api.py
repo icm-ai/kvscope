@@ -14,6 +14,17 @@ from kvscope.calculators.weights import (
     WeightMemoryEstimate,
     estimate_weight_memory,
 )
+from kvscope.calibration import (
+    CalibrationComparison,
+    CalibrationComparisonStatus,
+    CalibrationIdentityVerification,
+    CalibrationInferenceConfig,
+    CalibrationMeasurement,
+    RelativeError,
+    compare_calibration_measurement,
+    load_calibration_measurement,
+    load_memory_feasibility_report,
+)
 from kvscope.domain.aggregation import (
     MemoryAggregationResult,
     MemoryComponentRequirement,
@@ -66,7 +77,12 @@ from kvscope.domain.recommendation import (
     TradeoffSeverity,
     WorkloadConstraints,
 )
-from kvscope.domain.report import AnalysisReport, MemoryFeasibilityReport
+from kvscope.domain.report import (
+    AnalysisInferenceConfig,
+    AnalysisProvenance,
+    AnalysisReport,
+    MemoryFeasibilityReport,
+)
 from kvscope.domain.runtime_overhead import (
     RuntimeOverheadEstimate,
     RuntimeOverheadOverrides,
@@ -94,6 +110,7 @@ from kvscope.errors import (
     BackendProfileError,
     BackendProfileNotFoundError,
     BackendVersionMismatchError,
+    CalibrationLoadError,
     CandidateEvaluationError,
     ConstraintAnalysisError,
     FeasibilityEvaluationError,
@@ -132,6 +149,8 @@ from kvscope.resolvers.hardware import (
 
 __all__ = [
     "ActiveSequenceLimitResult",
+    "AnalysisInferenceConfig",
+    "AnalysisProvenance",
     "AnalysisReport",
     "AttentionMode",
     "BackendMemoryModel",
@@ -142,6 +161,12 @@ __all__ = [
     "BackendSpec",
     "BackendVersionMismatchError",
     "ByteRange",
+    "CalibrationComparison",
+    "CalibrationComparisonStatus",
+    "CalibrationIdentityVerification",
+    "CalibrationInferenceConfig",
+    "CalibrationLoadError",
+    "CalibrationMeasurement",
     "CandidateEvaluationError",
     "CandidateMemoryImpact",
     "CandidateVerificationStatus",
@@ -191,6 +216,7 @@ __all__ = [
     "ProductFeasibilityStatus",
     "ProfileValidationError",
     "RatioRange",
+    "RelativeError",
     "RecommendationAction",
     "RecommendationBudgetTarget",
     "RecommendationCandidate",
@@ -230,6 +256,7 @@ __all__ = [
     "assess_memory_feasibility",
     "calculate_kv_cache",
     "calculate_memory_savings",
+    "compare_calibration_measurement",
     "determine_recommendation_eligibility",
     "estimate_hardware_memory_budget",
     "estimate_kv_cache",
@@ -239,6 +266,8 @@ __all__ = [
     "find_safe_active_sequence_limits",
     "find_safe_context_limits",
     "generate_recommendations",
+    "load_calibration_measurement",
+    "load_memory_feasibility_report",
     "resolve_backend_profile",
     "resolve_hardware_profile",
     "resolve_model",

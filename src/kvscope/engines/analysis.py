@@ -4,7 +4,7 @@ from kvscope.calculators.kv_cache import KVCacheEstimate
 from kvscope.calculators.weights import WeightMemoryEstimate
 from kvscope.domain.constraints import ConstraintPolicy
 from kvscope.domain.memory_budget import HardwareMemoryBudget
-from kvscope.domain.report import MemoryFeasibilityReport
+from kvscope.domain.report import AnalysisProvenance, MemoryFeasibilityReport
 from kvscope.domain.runtime_overhead import RuntimeOverheadEstimate
 from kvscope.engines.aggregation import aggregate_memory_requirements
 from kvscope.engines.constraints import analyze_memory_constraints
@@ -18,6 +18,7 @@ def assess_memory_feasibility(
     runtime_overhead: RuntimeOverheadEstimate,
     hardware_budget: HardwareMemoryBudget,
     constraint_policy: ConstraintPolicy | None = None,
+    provenance: AnalysisProvenance | None = None,
     strict: bool = False,
 ) -> MemoryFeasibilityReport:
     """Assess overall LLM deployment memory feasibility across Phase 7 engines."""
@@ -41,6 +42,7 @@ def assess_memory_feasibility(
 
     return MemoryFeasibilityReport(
         schema_version="v0.1",
+        provenance=provenance,
         aggregation=aggregation,
         feasibility=feasibility,
         constraint_analysis=constraints,

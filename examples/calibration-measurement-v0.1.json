@@ -1,0 +1,38 @@
+{
+  "schema_version": "v0.1",
+  "record_id": "example-qwen-4b-vllm-2025-01-15",
+  "collected_at": "2025-01-15T12:00:00Z",
+  "backend_profile_id": "vllm-generic-unverified-v0",
+  "backend_version": null,
+  "hardware_profile_id": "generic-discrete-16gib",
+  "model_id": "qwen-example",
+  "model_revision": null,
+  "model_config_digest": null,
+  "inference_config": {
+    "context_length": 4096,
+    "batch_size": 1,
+    "max_num_seqs": 1,
+    "active_sequences": 1,
+    "prefix_tokens": 0,
+    "multimodal_tokens": 0,
+    "weight_dtype": "fp16",
+    "kv_dtype": "fp16",
+    "graph_capture_enabled": false,
+    "cpu_offload_bytes": 0
+  },
+  "observed_peak_memory_bytes": 10485760000,
+  "measurement_source": "local monitoring export",
+  "measurement_method": "peak device-memory value reported after model load and inference",
+  "confidence": "medium",
+  "notes": "Synthetic documentation example; replace the observed value with a real measurement.",
+  "evidence": [
+    {
+      "evidence_id": "example-local-monitoring-export",
+      "source_type": "local_measurement",
+      "source": "redacted local monitoring export",
+      "version": "1",
+      "observed_at": "2025-01-15T12:00:00Z",
+      "notes": "No hardware identifiers, paths, usernames, or prompts are included."
+    }
+  ]
+}

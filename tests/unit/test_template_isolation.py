@@ -12,7 +12,7 @@ from kvscope.domain.evidence import Evidence
 from kvscope.domain.hardware import HardwareProfile, MemoryQuantityInput
 from kvscope.domain.ranges import ByteRange, RatioRange
 from kvscope.domain.runtime_overhead import RuntimeOverheadOverrides
-from kvscope.errors import BackendProfileNotFoundError, IncompleteBackendProfileError
+from kvscope.errors import IncompleteBackendProfileError
 from kvscope.registries.backends import get_default_backend_registry
 from kvscope.registries.loader import parse_backend_profile, safe_load_file_content
 from kvscope.resolvers.backend import resolve_backend_profile
@@ -37,15 +37,18 @@ def test_default_registry_does_not_contain_templates() -> None:
     """Verify that official registry does not include template profiles."""
     registry = get_default_backend_registry()
     profiles = registry.list_profiles()
-    assert len(profiles) == 0
+    assert len(profiles) == 2
+    assert all("template" not in profile.profile_id for profile in profiles)
     assert registry.get("vllm-generic-template") is None
-    assert registry.get("vllm") is None
+    assert registry.get("vllm") is not None
 
 
-def test_resolve_backend_profile_does_not_auto_select_templates() -> None:
-    """Verify that resolve_backend_profile fails on default registry."""
-    with pytest.raises(BackendProfileNotFoundError):
-        resolve_backend_profile("vllm")
+def test_resolve_backend_profile_selects_the_bundled_unverified_profile() -> None:
+    """Default resolution must select a complete profile, never a template."""
+    resolved = resolve_backend_profile("vllm")
+
+    assert resolved.profile.profile_id == "vllm-generic-unverified-v0"
+    assert resolved.profile.status == ProfileStatus.UNVERIFIED
 
 
 def test_template_file_isolation_and_overhead_engine_rejection(

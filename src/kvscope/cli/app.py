@@ -18,17 +18,41 @@ from kvscope.api import (
     WeightMemoryEstimate,
     assess_memory_feasibility,
     estimate_hardware_memory_budget,
+    estimate_kv_cache,
     estimate_runtime_overhead,
+    estimate_weight_memory,
     generate_recommendations,
     resolve_backend_profile,
     resolve_hardware_profile,
     resolve_model,
 )
+from kvscope.calibration import (
+    CalibrationComparisonStatus,
+    compare_calibration_measurement,
+    load_calibration_measurement,
+    load_memory_feasibility_report,
+)
+from kvscope.domain.config import InferenceConfig
+from kvscope.domain.dtypes import KVDType, WeightDType
 from kvscope.domain.memory_budget import HardwareMemoryBudget
-from kvscope.domain.report import MemoryFeasibilityReport
+from kvscope.domain.recommendation import (
+    RuntimeRecomputeRequest,
+    WeightRecomputeRequest,
+)
+from kvscope.domain.report import (
+    AnalysisInferenceConfig,
+    AnalysisProvenance,
+    MemoryFeasibilityReport,
+)
 from kvscope.domain.runtime_overhead import RuntimeOverheadEstimate
+from kvscope.errors import CalibrationLoadError
 from kvscope.registries.backends import get_default_backend_registry
 from kvscope.registries.hardware import get_default_hardware_registry
+from kvscope.serialization.calibration import (
+    format_calibration_comparison_terminal,
+    serialize_calibration_comparison_json,
+    serialize_calibration_comparison_markdown,
+)
 from kvscope.serialization.json import (
     serialize_budget_to_json,
     serialize_feasibility_report_json,
@@ -223,6 +247,67 @@ def build_parser() -> argparse.ArgumentParser:
     rec_parser.add_argument("--minimum-context", type=int, default=None)
     rec_parser.add_argument("--minimum-active-sequences", type=int, default=None)
     rec_parser.add_argument(
+        "--format", choices=("terminal", "json", "markdown"), default="terminal"
+    )
+
+    calibrate_parser = subparsers.add_parser(
+        "calibrate", help="Import offline measurements and analyze estimation error."
+    )
+    calibrate_sub = calibrate_parser.add_subparsers(
+        dest="action", help="Calibration action"
+    )
+    calibrate_compare = calibrate_sub.add_parser(
+        "compare", help="Compare a feasibility report with a local measurement."
+    )
+    calibrate_compare.add_argument(
+        "--report-json", required=True, help="Path to MemoryFeasibilityReport JSON"
+    )
+    calibrate_compare.add_argument(
+        "--measurement-json", required=True, help="Path to calibration measurement JSON"
+    )
+    calibrate_compare.add_argument(
+        "--format", choices=("terminal", "json", "markdown"), default="terminal"
+    )
+
+    analyze_parser = subparsers.add_parser(
+        "analyze", help="Run an end-to-end model memory assessment."
+    )
+    analyze_parser.add_argument(
+        "source", help="Model source, profile ID, or local config"
+    )
+    analyze_parser.add_argument("--hardware", required=True, help="Hardware profile ID")
+    analyze_parser.add_argument(
+        "--backend", required=True, help="Backend ID or profile ID"
+    )
+    analyze_parser.add_argument("--backend-version", default=None)
+    analyze_parser.add_argument("--revision", default=None)
+    analyze_parser.add_argument("--offline", action="store_true")
+    analyze_parser.add_argument(
+        "--parameter-count",
+        type=int,
+        default=None,
+        help="Override a missing model parameter count.",
+    )
+    analyze_parser.add_argument(
+        "--weight-dtype",
+        choices=tuple(dtype.value for dtype in WeightDType),
+        default=WeightDType.FP16.value,
+    )
+    analyze_parser.add_argument(
+        "--kv-dtype",
+        choices=tuple(dtype.value for dtype in KVDType),
+        default=KVDType.FP16.value,
+    )
+    analyze_parser.add_argument("--context", type=int, required=True)
+    analyze_parser.add_argument("--batch-size", type=int, default=1)
+    analyze_parser.add_argument("--max-num-seqs", type=int, default=1)
+    analyze_parser.add_argument("--prefix-tokens", type=int, default=0)
+    analyze_parser.add_argument("--multimodal-tokens", type=int, default=0)
+    analyze_parser.add_argument("--user-reserve-bytes", type=int, default=0)
+    analyze_parser.add_argument("--graph-capture", action="store_true")
+    analyze_parser.add_argument("--recommend", action="store_true")
+    analyze_parser.add_argument("--max-candidates", type=int, default=5)
+    analyze_parser.add_argument(
         "--format", choices=("terminal", "json", "markdown"), default="terminal"
     )
 
@@ -466,6 +551,158 @@ def _handle_recommend(parsed: argparse.Namespace) -> int:
         return 10
 
 
+def _handle_calibrate(parsed: argparse.Namespace) -> int:
+    """Load local JSON inputs and render an offline calibration comparison."""
+    if parsed.action != "compare":
+        print("Error: calibrate requires an action such as 'compare'.", file=sys.stderr)
+        return 2
+    try:
+        report = load_memory_feasibility_report(parsed.report_json)
+        measurement = load_calibration_measurement(parsed.measurement_json)
+    except CalibrationLoadError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    comparison = compare_calibration_measurement(report, measurement)
+    if parsed.format == "json":
+        print(serialize_calibration_comparison_json(comparison))
+    elif parsed.format == "markdown":
+        print(serialize_calibration_comparison_markdown(comparison))
+    else:
+        print(format_calibration_comparison_terminal(comparison))
+    if comparison.status in {
+        CalibrationComparisonStatus.INCOMPLETE_REPORT,
+        CalibrationComparisonStatus.IDENTITY_MISMATCH,
+        CalibrationComparisonStatus.IDENTITY_UNVERIFIED,
+    }:
+        return 3
+    return 0
+
+
+def _handle_analyze(parsed: argparse.Namespace) -> int:
+    """Resolve inputs and run the complete static memory-analysis workflow."""
+    resolved_model = resolve_model(
+        parsed.source, revision=parsed.revision, offline=parsed.offline
+    )
+    model = resolved_model.spec
+    if parsed.parameter_count is not None:
+        model = model.model_copy(update={"parameter_count": parsed.parameter_count})
+    if model.parameter_count is None:
+        print(
+            "Error: model parameter_count is unavailable; pass --parameter-count.",
+            file=sys.stderr,
+        )
+        return 2
+
+    hardware = resolve_hardware_profile(parsed.hardware, allow_deprecated=True).profile
+    backend = resolve_backend_profile(
+        parsed.backend,
+        version=parsed.backend_version,
+        hardware=hardware,
+        allow_deprecated=True,
+        allow_unverified=True,
+    ).profile
+    config = InferenceConfig(
+        weight_dtype=WeightDType(parsed.weight_dtype),
+        kv_dtype=KVDType(parsed.kv_dtype),
+        context_length=parsed.context,
+        batch_size=parsed.batch_size,
+        max_num_seqs=parsed.max_num_seqs,
+        prefix_tokens=parsed.prefix_tokens,
+        multimodal_tokens=parsed.multimodal_tokens,
+        graph_capture_enabled=parsed.graph_capture,
+    )
+    weights = estimate_weight_memory(
+        parameter_count=model.parameter_count,
+        dtype=config.weight_dtype,
+    )
+    kv_cache = estimate_kv_cache(model, config, backend.to_spec())
+    budget = estimate_hardware_memory_budget(
+        hardware, user_reserve_bytes=parsed.user_reserve_bytes
+    )
+    runtime = estimate_runtime_overhead(
+        backend=backend,
+        hardware=hardware,
+        resident_weight_bytes=weights.resident_weight_bytes,
+        parameter_count=model.parameter_count,
+        graph_capture_enabled=config.graph_capture_enabled,
+    )
+    provenance = AnalysisProvenance(
+        model_id=resolved_model.source.model_id,
+        model_revision=resolved_model.source.resolved_revision,
+        model_config_digest=resolved_model.source.config_digest,
+        backend_profile_id=backend.profile_id,
+        backend_version=parsed.backend_version,
+        hardware_profile_id=hardware.profile_id,
+        inference_config=AnalysisInferenceConfig(
+            context_length=config.context_length,
+            batch_size=config.batch_size,
+            max_num_seqs=config.max_num_seqs,
+            active_sequences=config.active_sequences,
+            prefix_tokens=config.prefix_tokens,
+            multimodal_tokens=config.multimodal_tokens,
+            weight_dtype=config.weight_dtype.value,
+            kv_dtype=config.kv_dtype.value,
+            graph_capture_enabled=config.graph_capture_enabled,
+            cpu_offload_bytes=config.cpu_offload_bytes,
+        ),
+    )
+    feasibility = assess_memory_feasibility(
+        weights=weights,
+        kv_cache=kv_cache,
+        runtime_overhead=runtime,
+        hardware_budget=budget,
+        provenance=provenance,
+    )
+
+    if not parsed.recommend:
+        if parsed.format == "json":
+            print(serialize_feasibility_report_json(feasibility))
+        elif parsed.format == "markdown":
+            print(serialize_feasibility_report_markdown(feasibility))
+        else:
+            print(format_feasibility_report_terminal(feasibility))
+        return 0
+
+    recommendation_context = RecommendationContext(
+        model=model,
+        inference_config=config,
+        current_weight_estimate=weights,
+        current_kv_estimate=kv_cache,
+        current_runtime_estimate=runtime,
+        hardware_budget=budget,
+        backend_profile=backend,
+        hardware_profile=hardware,
+        weight_recompute_request=WeightRecomputeRequest(
+            parameter_count=model.parameter_count,
+            weight_dtype=config.weight_dtype,
+        ),
+        runtime_recompute_request=RuntimeRecomputeRequest(
+            resident_weight_bytes=weights.resident_weight_bytes,
+            parameter_count=model.parameter_count,
+            graph_capture_enabled=config.graph_capture_enabled,
+        ),
+    )
+    recommendation = generate_recommendations(
+        context=recommendation_context,
+        baseline_report=feasibility,
+        policy=RecommendationPolicy(maximum_candidates=parsed.max_candidates),
+    )
+    if parsed.format == "json":
+        print(serialize_recommendation_report_json(recommendation))
+    elif parsed.format == "markdown":
+        print(
+            f"{serialize_feasibility_report_markdown(feasibility)}\n\n"
+            f"{serialize_recommendation_report_markdown(recommendation)}"
+        )
+    else:
+        print(
+            f"{format_feasibility_report_terminal(feasibility)}\n\n"
+            f"{format_recommendation_report_terminal(recommendation)}"
+        )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI and return a process exit code."""
     arguments = list(sys.argv[1:] if argv is None else argv)
@@ -490,6 +727,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _handle_assess_memory(parsed)
     elif parsed.subcommand == "recommend":
         return _handle_recommend(parsed)
+    elif parsed.subcommand == "calibrate":
+        return _handle_calibrate(parsed)
+    elif parsed.subcommand == "analyze":
+        return _handle_analyze(parsed)
     else:
         # Backward compatibility for direct argument invocation
         if len(arguments) >= 2 and arguments[0] == "inspect-model":

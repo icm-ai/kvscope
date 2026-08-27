@@ -1,7 +1,10 @@
 # KVScope v0.1 Implementation Plan
 
-本文档把产品和架构文档中的 v0.1 拆分为可独立验收的阶段。当前阶段：
-Phase 4（Weight Engine）已完成；后续阶段保持未开始。
+本文档把产品和架构文档中的 v0.1 拆分为可独立验收的阶段。当前状态：
+Phase 0、1、4、5、6、7、8 已完成。原始的 Phase 2 与 Phase 3 被后续的
+Phase 5--8 重新拆分并交付；其条目保留用于追溯。Phase 9 与 Phase 10a 已完成，
+v0.1 的静态分析核心及离线校准导入/误差分析已交付；Web UI、推理后端启动、
+benchmark 和自动调优仍待后续版本单独规划。
 
 ## Phase 0：Repository Bootstrap — 已完成
 
@@ -27,7 +30,7 @@ Phase 4（Weight Engine）已完成；后续阶段保持未开始。
 独立验收：给定手工模型配置和硬件配置时，所有组件输出整数 bytes、公式可
 审查，且覆盖率和单调性测试通过。
 
-## Phase 2：Resolvers + Registry
+## Phase 2：Resolvers + Registry — 由 Phase 5 和 Phase 6 交付
 
 交付内容：
 
@@ -41,7 +44,7 @@ Phase 4（Weight Engine）已完成；后续阶段保持未开始。
 独立验收：提供本地输入或 registry ID 时，resolver 返回标准 domain 对象；
 无数据或字段不一致时返回可操作错误，不静默猜测。
 
-## Phase 3：Decision + Reports + CLI
+## Phase 3：Decision + Reports + CLI — 核心能力由 Phase 7 和 Phase 8 交付
 
 交付内容：
 
@@ -53,6 +56,9 @@ Phase 4（Weight Engine）已完成；后续阶段保持未开始。
 
 独立验收：对一个可运行和一个超预算配置，CLI 与 JSON 报告给出一致的内存
 分解、结论、主要约束和建议。
+
+Phase 9 以单一的 `analyze` 工作流交付面向新用户的端到端入口；原计划中的
+`inspect`、`estimate`、`fit`、`compare`、`explain` 独立命令不属于 v0.1。
 
 ## Phase 4：Weight Engine — 已完成
 
@@ -108,6 +114,48 @@ mypy、pytest 和覆盖率门禁。
 - Deterministic Ranking Engine (`rank_recommendation_candidates`)：无浮点/随机数的 10 元组多键确定性排序。
 - Top-level `generate_recommendations` API，`kvscope recommend` CLI，`recommendation-report-v0.1.json` JSON schema，8 个 Golden Cases A-H，Unit 与 Hypothesis Property-based 测试。
 
+## Phase 9：v0.1 端到端 CLI 与发布就绪 — 已完成
+
+目标是在不改变公式或决策引擎语义的前提下，将已完成的核心能力组合为用户可
+发现、可复现的工作流，并使文档与实际 API/CLI 保持一致。
+
+交付内容：
+
+- `kvscope analyze` 将模型解析、参数量权重估算、KV Cache、硬件预算、运行时
+  开销、可行性评估串联为单次命令；可选生成 Recommendation Report；
+- 内置 vLLM 与 llama.cpp 的通用 `unverified` Backend Profile，用于低置信度的
+  初步规划，始终提示用户须在目标环境上验证；
+- README、profile 文档与 quick start 同步实际 CLI 和当前阶段状态；
+- 端到端 CLI 测试覆盖正常分析、推荐 JSON 输出和缺失参数量的拒绝路径。
+
+校准、Web UI、启动推理后端、benchmark 和自动调优仍不属于本阶段。
+
+## Phase 10a：Runtime Calibration — 离线测量记录导入与误差分析 — 已完成
+
+本阶段将用户或外部工具已采集的峰值内存数据作为本地 JSON 导入，并与完整的
+`MemoryFeasibilityReport` 比较；它不执行或编排任何 runtime。
+
+交付内容：
+
+- 冻结的 `CalibrationMeasurement` Pydantic 边界模型和
+  `calibration-record-v0.1.json` 版本化 schema；记录保留采集时间、模型、
+  backend/hardware、可复现 inference 配置、正整数 bytes、来源和 evidence；
+- 仅本地文件的严格 JSON/Pydantic loader，提供文件不存在、非法 JSON、schema
+  不匹配及非正峰值的可操作错误；
+- `kvscope analyze` 生成的 feasibility JSON 记录 model/backend/hardware 和完整
+  inference 配置 provenance；`compare_calibration_measurement(report, measurement)`
+  逐字段验证已知身份，拒绝 mismatch 或无 provenance 的报告，对完整总需求区间输出
+  落点、lower/expected/upper 的有符号字节差、精确分数误差、置信度、假设、warnings
+  与 evidence；partial report 明确返回不可比较结果；
+- `kvscope calibrate compare --report-json REPORT --measurement-json MEASUREMENT`
+  的 Terminal、JSON 和 Markdown 输出；JSON 是版本化事实源；
+- 校准记录说明文档、无敏感信息的示例 measurement JSON，以及覆盖 loader、
+  区间内/外、partial report 和 CLI 格式的测试。
+
+明确非目标：不执行 benchmark、不启动 backend、不抓取日志、不访问网络、不做
+`fit` 或自动调整 backend profile、allocator margin、headroom 或其他预留。此类
+人工审核后的拟合能力留给 Phase 10b。
+
 ## 阶段依赖
 
 ```text
@@ -116,5 +164,8 @@ Phase 0
 Phase 1 ──→ Phase 2 ──→ Phase 4 (Weight Engine) ──→ Phase 5 (Model Resolver)
                                                          ↓
 Phase 8 (Recommendation Engine) ←── Phase 7 (Memory Engine) ←── Phase 6 (Hardware & Overhead)
+  ↓
+Phase 9 (End-to-end CLI & release readiness)
+  ↓
+Phase 10a (Offline calibration import & error analysis)
 ```
-
