@@ -9,7 +9,12 @@ KVScope 是一个面向 LLM 推理前内存估算、KV Cache 分析和部署可�
 当前不实现：
 
 - InferPilot 的完整集成；
-- Web UI、模型下载、推理服务、benchmark 和自动调优。
+- Web UI、模型下载、推理服务和自动调优。
+
+Phase 10b 例外：允许显式 opt-in 的本地外部 runner 执行用户指定的已安装后端命令，
+以采集峰值内存。核心库仍不得依赖或导入推理后端、执行远程模型代码、下载模型或
+访问网络；runner 只能生成待人工审核的 calibration record / profile 候选，不得
+自动修改 profile。
 
 
 ## 编码规则
