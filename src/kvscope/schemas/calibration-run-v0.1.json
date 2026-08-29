@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KVScope Calibration Run Manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "run_id", "command", "observation_json_path",
+    "repetitions", "timeout_seconds", "working_directory",
+    "inherit_environment", "environment_names", "measurement", "notes"
+  ],
+  "properties": {
+    "schema_version": { "const": "v0.1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "command": {
+      "type": "array", "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "observation_json_path": { "type": "string", "minLength": 1 },
+    "repetitions": { "type": "integer", "exclusiveMinimum": 0 },
+    "timeout_seconds": { "type": "integer", "exclusiveMinimum": 0 },
+    "working_directory": { "type": ["string", "null"] },
+    "inherit_environment": { "type": "boolean" },
+    "environment_names": { "type": "array", "items": { "type": "string" } },
+    "measurement": {
+      "type": "object",
+      "description": "CalibrationMeasurementTemplate; strictly validated by Pydantic at runtime."
+    },
+    "notes": { "type": ["string", "null"] }
+  }
+}

@@ -6,6 +6,9 @@ reports are the rendering source of truth; all memory values are integer bytes.
 - `calibration-record-v0.1.json` defines a local peak-memory measurement record
   imported by `kvscope calibrate compare`.
 - `feasibility-report-v0.1.json` defines the report consumed by that comparison.
+- `calibration-run-v0.1.json` defines an explicit local argv runner manifest.
+- `calibration-profile-candidate-v0.1.json` defines review-only scoped empirical
+  reserve candidates; it is not a backend profile schema.
 
 The runtime does not add a JSON Schema validator dependency. Local calibration
 inputs are strictly validated by the matching frozen Pydantic model, including

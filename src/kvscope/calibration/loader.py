@@ -1,16 +1,23 @@
-"""Local-only loaders for calibration measurements and feasibility reports."""
+"""Local-only loaders for calibration artifacts and feasibility reports."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
-from kvscope.calibration.schema import CalibrationMeasurement
+from kvscope.calibration.schema import (
+    CalibrationComparison,
+    CalibrationMeasurement,
+    CalibrationProfileCandidate,
+    CalibrationRunManifest,
+)
 from kvscope.domain.report import MemoryFeasibilityReport
 from kvscope.errors import CalibrationLoadError
+
+ArtifactModel = TypeVar("ArtifactModel", bound=BaseModel)
 
 
 def _read_local_json(path: str | Path, *, label: str) -> dict[str, Any]:
@@ -21,14 +28,12 @@ def _read_local_json(path: str | Path, *, label: str) -> dict[str, Any]:
             f"{label} must be a local file path, not a URL: {path_string}",
             code="non_local_path",
         )
-
     local_path = Path(path)
     if not local_path.is_file():
         raise CalibrationLoadError(
             f"{label} file does not exist or is not a regular file: {local_path}",
             code="file_not_found",
         )
-
     try:
         raw_value = json.loads(local_path.read_text(encoding="utf-8"))
     except UnicodeDecodeError as exc:
@@ -42,7 +47,6 @@ def _read_local_json(path: str | Path, *, label: str) -> dict[str, Any]:
             f"{exc.colno}: {exc.msg}",
             code="invalid_json",
         ) from exc
-
     if not isinstance(raw_value, dict):
         raise CalibrationLoadError(
             f"{label} JSON root must be an object: {local_path}",
@@ -51,17 +55,68 @@ def _read_local_json(path: str | Path, *, label: str) -> dict[str, Any]:
     return raw_value
 
 
-def load_calibration_measurement(path: str | Path) -> CalibrationMeasurement:
-    """Load and strictly validate a versioned measurement record from local JSON."""
-    data = _read_local_json(path, label="Calibration measurement")
+def _load_model(
+    path: str | Path,
+    *,
+    label: str,
+    model_type: type[ArtifactModel],
+    expected_kind: str | None = None,
+    schema_name: str | None = None,
+) -> ArtifactModel:
+    """Load one Pydantic artifact, optionally validating serializer kind."""
+    data = _read_local_json(path, label=label)
+    kind = data.pop("kind", None)
+    if expected_kind is not None and kind is not None and kind != expected_kind:
+        raise CalibrationLoadError(
+            f"{label} has unexpected kind; expected {expected_kind!r}.",
+            code="unexpected_artifact_kind",
+        )
     try:
-        return CalibrationMeasurement.model_validate(data)
+        return model_type.model_validate(data)
     except ValidationError as exc:
         raise CalibrationLoadError(
-            "Calibration measurement does not match calibration-record-v0.1.json: "
-            f"{exc}",
-            code="invalid_measurement_schema",
+            f"{label} does not match {schema_name or 'its v0.1 schema'}: {exc}",
+            code="invalid_artifact_schema",
         ) from exc
+
+
+def load_calibration_measurement(path: str | Path) -> CalibrationMeasurement:
+    """Load and strictly validate a versioned measurement record from local JSON."""
+    return _load_model(
+        path,
+        label="Calibration measurement",
+        model_type=CalibrationMeasurement,
+        schema_name="calibration-record-v0.1.json",
+    )
+
+
+def load_calibration_run_manifest(path: str | Path) -> CalibrationRunManifest:
+    """Load a strictly validated manifest for an explicit local runner command."""
+    return _load_model(
+        path,
+        label="Calibration run manifest",
+        model_type=CalibrationRunManifest,
+    )
+
+
+def load_calibration_comparison(path: str | Path) -> CalibrationComparison:
+    """Load a JSON comparison emitted by ``kvscope calibrate compare``."""
+    return _load_model(
+        path,
+        label="Calibration comparison",
+        model_type=CalibrationComparison,
+        expected_kind="calibration_comparison",
+    )
+
+
+def load_calibration_profile_candidate(path: str | Path) -> CalibrationProfileCandidate:
+    """Load a local review-only empirical reserve candidate."""
+    return _load_model(
+        path,
+        label="Calibration profile candidate",
+        model_type=CalibrationProfileCandidate,
+        expected_kind="calibration_profile_candidate",
+    )
 
 
 def load_memory_feasibility_report(path: str | Path) -> MemoryFeasibilityReport:

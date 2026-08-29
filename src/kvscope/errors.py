@@ -13,6 +13,18 @@ class CalibrationLoadError(KVScopeError, ValueError):
         super().__init__(message)
 
 
+class CalibrationRunnerError(KVScopeError, ValueError):
+    """An opt-in local calibration runner cannot safely complete a run."""
+
+    def __init__(self, message: str, *, code: str) -> None:
+        self.code = code
+        super().__init__(message)
+
+
+class CalibrationFitError(KVScopeError, ValueError):
+    """Calibration comparisons cannot form one scoped empirical candidate."""
+
+
 class ModelResolutionError(KVScopeError):
     """Raised when a model source cannot be resolved."""
 

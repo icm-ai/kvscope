@@ -2,9 +2,9 @@
 
 本文档把产品和架构文档中的 v0.1 拆分为可独立验收的阶段。当前状态：
 Phase 0、1、4、5、6、7、8 已完成。原始的 Phase 2 与 Phase 3 被后续的
-Phase 5--8 重新拆分并交付；其条目保留用于追溯。Phase 9 与 Phase 10a 已完成，
-v0.1 的静态分析核心及离线校准导入/误差分析已交付；Web UI、推理后端启动、
-benchmark 和自动调优仍待后续版本单独规划。
+Phase 5--8 重新拆分并交付；其条目保留用于追溯。Phase 9、Phase 10a 与
+Phase 10b 已完成，v0.1 的静态分析核心、离线校准导入/误差分析及受控本地采集、
+拟合/审核工件已交付；Web UI、模型下载、推理服务与自动调优仍待后续版本单独规划。
 
 ## Phase 0：Repository Bootstrap — 已完成
 
@@ -156,6 +156,30 @@ mypy、pytest 和覆盖率门禁。
 `fit` 或自动调整 backend profile、allocator margin、headroom 或其他预留。此类
 人工审核后的拟合能力留给 Phase 10b。
 
+## Phase 10b：Runtime Calibration — 受控本地采集、Scoped Fit 与人工审核 — 已完成
+
+本阶段只允许用户显式 opt-in 的本地 argv runner；核心库不增加推理后端依赖，且
+不会下载模型、执行远程模型代码或自动修改 profile。
+
+交付内容：
+
+- `CalibrationRunManifest` / `CalibrationObservation` / `CalibrationRunResult`
+  版本化工件，以及 `kvscope calibrate run`；runner 使用 `shell=False`、超时和
+  `KVSCOPE_OBSERVATION_PATH` observation contract，保存 command/manifest digest 而
+  非 command output 或环境变量值；
+- 重复采集保留所有成功 measurement，选择其中最大峰值作为保守结果；失败样本保留
+  非敏感 failure code，不能形成成功测量时明确返回非零；
+- `kvscope calibrate fit` 只接受 identity `verified` 且 scope 完全相同的 comparison，
+  输出 exact scoped empirical reserve envelope；数据少于三个样本时标记
+  `insufficient_data`，不伪造通用 backend 系数；
+- `kvscope calibrate review` 输出绑定 candidate SHA-256、reviewer、理由和接受/拒绝
+  决定的不可变 review artifact；接受不 promotion、更不改写 backend profile；
+- runner / candidate schema、CLI、JSON/Terminal/Markdown 输出、文档和 unit tests。
+
+明确非目标：网络 sandbox、自动 profile promotion、通用公式参数拟合、远程 backend、
+模型下载、自动调优和推理服务。外部 runner 命令的 no-network policy 由操作者的本地
+环境负责执行。
+
 ## 阶段依赖
 
 ```text
@@ -168,4 +192,6 @@ Phase 8 (Recommendation Engine) ←── Phase 7 (Memory Engine) ←── Phas
 Phase 9 (End-to-end CLI & release readiness)
   ↓
 Phase 10a (Offline calibration import & error analysis)
+  ↓
+Phase 10b (Controlled local collection, scoped fit & review)
 ```

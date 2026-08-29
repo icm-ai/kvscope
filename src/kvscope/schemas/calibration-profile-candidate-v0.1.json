@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KVScope Calibration Profile Candidate v0.1",
+  "description": "A review-only scoped empirical reserve candidate; not an active backend profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "candidate_id", "status", "scope", "comparison_record_ids",
+    "sample_count", "additional_reserve_bytes", "confidence", "assumptions",
+    "warnings", "evidence"
+  ],
+  "properties": {
+    "schema_version": { "const": "v0.1" },
+    "candidate_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["scoped_envelope", "insufficient_data"] },
+    "scope": { "type": "object" },
+    "comparison_record_ids": {
+      "type": "array", "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "sample_count": { "type": "integer", "exclusiveMinimum": 0 },
+    "additional_reserve_bytes": {
+      "type": "object",
+      "required": ["lower_bytes", "expected_bytes", "upper_bytes"]
+    },
+    "confidence": { "enum": ["exact", "high", "medium", "low", "unknown"] },
+    "assumptions": { "type": "array", "items": { "type": "string" } },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "evidence": { "type": "array", "items": { "type": "object" } }
+  }
+}

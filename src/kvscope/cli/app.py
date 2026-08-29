@@ -27,10 +27,17 @@ from kvscope.api import (
     resolve_model,
 )
 from kvscope.calibration import (
+    CalibrationCandidateStatus,
     CalibrationComparisonStatus,
     compare_calibration_measurement,
+    fit_calibration_comparisons,
+    load_calibration_comparison,
     load_calibration_measurement,
+    load_calibration_profile_candidate,
+    load_calibration_run_manifest,
     load_memory_feasibility_report,
+    review_calibration_candidate,
+    run_calibration_manifest,
 )
 from kvscope.domain.config import InferenceConfig
 from kvscope.domain.dtypes import KVDType, WeightDType
@@ -45,13 +52,28 @@ from kvscope.domain.report import (
     MemoryFeasibilityReport,
 )
 from kvscope.domain.runtime_overhead import RuntimeOverheadEstimate
-from kvscope.errors import CalibrationLoadError
+from kvscope.errors import (
+    CalibrationFitError,
+    CalibrationLoadError,
+    CalibrationRunnerError,
+)
 from kvscope.registries.backends import get_default_backend_registry
 from kvscope.registries.hardware import get_default_hardware_registry
 from kvscope.serialization.calibration import (
     format_calibration_comparison_terminal,
     serialize_calibration_comparison_json,
     serialize_calibration_comparison_markdown,
+)
+from kvscope.serialization.calibration_runner import (
+    format_calibration_candidate_terminal,
+    format_calibration_review_terminal,
+    format_calibration_run_terminal,
+    serialize_calibration_candidate_markdown,
+    serialize_calibration_profile_candidate_json,
+    serialize_calibration_review_json,
+    serialize_calibration_review_markdown,
+    serialize_calibration_run_json,
+    serialize_calibration_run_markdown,
 )
 from kvscope.serialization.json import (
     serialize_budget_to_json,
@@ -266,6 +288,50 @@ def build_parser() -> argparse.ArgumentParser:
         "--measurement-json", required=True, help="Path to calibration measurement JSON"
     )
     calibrate_compare.add_argument(
+        "--format", choices=("terminal", "json", "markdown"), default="terminal"
+    )
+
+    calibrate_run = calibrate_sub.add_parser(
+        "run", help="Run an explicit local argv command and import observations."
+    )
+    calibrate_run.add_argument(
+        "--manifest-json", required=True, help="Path to CalibrationRunManifest JSON"
+    )
+    calibrate_run.add_argument(
+        "--format", choices=("terminal", "json", "markdown"), default="terminal"
+    )
+
+    calibrate_fit = calibrate_sub.add_parser(
+        "fit", help="Create a review-only scoped reserve candidate."
+    )
+    calibrate_fit.add_argument(
+        "--comparison-json",
+        action="append",
+        required=True,
+        help="Path to a verified CalibrationComparison JSON; repeat for each sample",
+    )
+    calibrate_fit.add_argument("--minimum-samples", type=int, default=3)
+    calibrate_fit.add_argument(
+        "--format", choices=("terminal", "json", "markdown"), default="terminal"
+    )
+
+    calibrate_review = calibrate_sub.add_parser(
+        "review", help="Record a human decision over a profile candidate."
+    )
+    calibrate_review.add_argument(
+        "--candidate-json",
+        required=True,
+        help="Path to CalibrationProfileCandidate JSON",
+    )
+    calibrate_review.add_argument("--reviewer", required=True)
+    calibrate_review.add_argument(
+        "--decision",
+        dest="review_status",
+        choices=("accepted", "rejected"),
+        required=True,
+    )
+    calibrate_review.add_argument("--notes", required=True)
+    calibrate_review.add_argument(
         "--format", choices=("terminal", "json", "markdown"), default="terminal"
     )
 
@@ -552,31 +618,83 @@ def _handle_recommend(parsed: argparse.Namespace) -> int:
 
 
 def _handle_calibrate(parsed: argparse.Namespace) -> int:
-    """Load local JSON inputs and render an offline calibration comparison."""
-    if parsed.action != "compare":
-        print("Error: calibrate requires an action such as 'compare'.", file=sys.stderr)
-        return 2
+    """Run one local calibration action without modifying active profiles."""
     try:
-        report = load_memory_feasibility_report(parsed.report_json)
-        measurement = load_calibration_measurement(parsed.measurement_json)
-    except CalibrationLoadError as exc:
+        if parsed.action == "compare":
+            report = load_memory_feasibility_report(parsed.report_json)
+            measurement = load_calibration_measurement(parsed.measurement_json)
+            comparison = compare_calibration_measurement(report, measurement)
+            if parsed.format == "json":
+                print(serialize_calibration_comparison_json(comparison))
+            elif parsed.format == "markdown":
+                print(serialize_calibration_comparison_markdown(comparison))
+            else:
+                print(format_calibration_comparison_terminal(comparison))
+            if comparison.status in {
+                CalibrationComparisonStatus.INCOMPLETE_REPORT,
+                CalibrationComparisonStatus.IDENTITY_MISMATCH,
+                CalibrationComparisonStatus.IDENTITY_UNVERIFIED,
+            }:
+                return 3
+            return 0
+
+        if parsed.action == "run":
+            manifest_path = Path(parsed.manifest_json)
+            manifest = load_calibration_run_manifest(manifest_path)
+            result = run_calibration_manifest(
+                manifest, manifest_directory=manifest_path.parent
+            )
+            if parsed.format == "json":
+                print(serialize_calibration_run_json(result))
+            elif parsed.format == "markdown":
+                print(serialize_calibration_run_markdown(result))
+            else:
+                print(format_calibration_run_terminal(result))
+            return 0 if result.successful_measurements else 3
+
+        if parsed.action == "fit":
+            comparisons = [
+                load_calibration_comparison(path) for path in parsed.comparison_json
+            ]
+            candidate = fit_calibration_comparisons(
+                comparisons, minimum_samples=parsed.minimum_samples
+            )
+            if parsed.format == "json":
+                print(serialize_calibration_profile_candidate_json(candidate))
+            elif parsed.format == "markdown":
+                print(serialize_calibration_candidate_markdown(candidate))
+            else:
+                print(format_calibration_candidate_terminal(candidate))
+            return (
+                0
+                if candidate.status is CalibrationCandidateStatus.SCOPED_ENVELOPE
+                else 3
+            )
+
+        if parsed.action == "review":
+            candidate = load_calibration_profile_candidate(parsed.candidate_json)
+            review = review_calibration_candidate(
+                candidate,
+                reviewer_id=parsed.reviewer,
+                status=parsed.review_status,
+                notes=parsed.notes,
+            )
+            if parsed.format == "json":
+                print(serialize_calibration_review_json(review))
+            elif parsed.format == "markdown":
+                print(serialize_calibration_review_markdown(review))
+            else:
+                print(format_calibration_review_terminal(review))
+            return 0
+
+        print(
+            "Error: calibrate requires compare, run, fit, or review.",
+            file=sys.stderr,
+        )
+        return 2
+    except (CalibrationLoadError, CalibrationRunnerError, CalibrationFitError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
-
-    comparison = compare_calibration_measurement(report, measurement)
-    if parsed.format == "json":
-        print(serialize_calibration_comparison_json(comparison))
-    elif parsed.format == "markdown":
-        print(serialize_calibration_comparison_markdown(comparison))
-    else:
-        print(format_calibration_comparison_terminal(comparison))
-    if comparison.status in {
-        CalibrationComparisonStatus.INCOMPLETE_REPORT,
-        CalibrationComparisonStatus.IDENTITY_MISMATCH,
-        CalibrationComparisonStatus.IDENTITY_UNVERIFIED,
-    }:
-        return 3
-    return 0
 
 
 def _handle_analyze(parsed: argparse.Namespace) -> int:

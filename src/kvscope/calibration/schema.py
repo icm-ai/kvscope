@@ -1,4 +1,4 @@
-"""Frozen domain models for offline calibration measurement records."""
+"""Frozen domain models for offline calibration and opt-in local runner records."""
 
 from __future__ import annotations
 
@@ -16,6 +16,9 @@ from kvscope.domain.signed_ranges import SignedByteRange
 
 CALIBRATION_RECORD_SCHEMA_VERSION: Literal["v0.1"] = "v0.1"
 CALIBRATION_COMPARISON_SCHEMA_VERSION: Literal["v0.1"] = "v0.1"
+CALIBRATION_RUN_SCHEMA_VERSION: Literal["v0.1"] = "v0.1"
+CALIBRATION_CANDIDATE_SCHEMA_VERSION: Literal["v0.1"] = "v0.1"
+CALIBRATION_REVIEW_SCHEMA_VERSION: Literal["v0.1"] = "v0.1"
 
 PositiveInt = Annotated[StrictInt, Field(gt=0)]
 NonNegativeInt = Annotated[StrictInt, Field(ge=0)]
@@ -38,12 +41,7 @@ class CalibrationInferenceConfig(DomainModel):
 
 
 class CalibrationMeasurement(DomainModel):
-    """An externally collected, local peak-memory measurement record.
-
-    This model records a measurement; it never represents a fitted backend profile.
-    Nullable identity fields explicitly preserve information that was not known when
-    the measurement was collected.
-    """
+    """An externally collected, local peak-memory measurement record."""
 
     schema_version: Literal["v0.1"]
     record_id: NonEmptyStr
@@ -82,6 +80,84 @@ class CalibrationMeasurement(DomainModel):
                 "confidence no higher than medium"
             )
         return self
+
+
+class CalibrationObservation(DomainModel):
+    """One peak-memory observation written by a user-selected local command."""
+
+    schema_version: Literal["v0.1"]
+    observation_id: NonEmptyStr
+    observed_at: datetime
+    observed_peak_memory_bytes: PositiveInt
+    evidence: Annotated[list[Evidence], Field(min_length=1)]
+    notes: StrictStr | None
+
+    @model_validator(mode="after")
+    def validate_observed_at_timezone(self) -> Self:
+        """Require a timezone-aware observation timestamp for auditability."""
+        if self.observed_at.tzinfo is None:
+            raise ValueError("observed_at must include a timezone offset")
+        return self
+
+
+class CalibrationMeasurementTemplate(DomainModel):
+    """Measurement metadata a local runner combines with each observation."""
+
+    record_id_prefix: NonEmptyStr
+    backend_profile_id: NonEmptyStr
+    backend_version: StrictStr | None
+    hardware_profile_id: NonEmptyStr
+    model_id: NonEmptyStr
+    model_revision: StrictStr | None
+    model_config_digest: StrictStr | None
+    inference_config: CalibrationInferenceConfig
+    measurement_source: NonEmptyStr
+    measurement_method: NonEmptyStr
+    confidence: Confidence
+    notes: StrictStr | None
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+class CalibrationRunManifest(DomainModel):
+    """Explicit local command contract for a repeatable calibration run."""
+
+    schema_version: Literal["v0.1"]
+    run_id: NonEmptyStr
+    command: Annotated[list[NonEmptyStr], Field(min_length=1)]
+    observation_json_path: NonEmptyStr
+    repetitions: PositiveInt = 1
+    timeout_seconds: PositiveInt = 300
+    working_directory: StrictStr | None
+    inherit_environment: StrictBool = True
+    environment_names: list[NonEmptyStr] = Field(default_factory=list)
+    measurement: CalibrationMeasurementTemplate
+    notes: StrictStr | None
+
+
+class CalibrationRunFailure(DomainModel):
+    """A non-sensitive failed runner attempt retained in the run result."""
+
+    sample_index: PositiveInt
+    code: NonEmptyStr
+    return_code: StrictInt | None
+    message: NonEmptyStr
+
+
+class CalibrationRunResult(DomainModel):
+    """Traceable outcome of repeated local observation collection."""
+
+    schema_version: Literal["v0.1"] = CALIBRATION_RUN_SCHEMA_VERSION
+    run_id: NonEmptyStr
+    manifest_digest: NonEmptyStr
+    command_digest: NonEmptyStr
+    started_at: datetime
+    completed_at: datetime
+    successful_measurements: list[CalibrationMeasurement] = Field(default_factory=list)
+    failures: list[CalibrationRunFailure] = Field(default_factory=list)
+    selected_measurement_id: StrictStr | None
+    conservative_peak_memory_bytes: PositiveInt | None
+    warnings: list[StrictStr] = Field(default_factory=list)
+    evidence: list[Evidence] = Field(default_factory=list)
 
 
 class CalibrationComparisonStatus(StrEnum):
@@ -133,3 +209,65 @@ class CalibrationComparison(DomainModel):
     assumptions: list[StrictStr] = Field(default_factory=list)
     warnings: list[StrictStr] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
+
+
+class CalibrationCandidateStatus(StrEnum):
+    """Readiness of a scoped empirical calibration candidate."""
+
+    SCOPED_ENVELOPE = "scoped_envelope"
+    INSUFFICIENT_DATA = "insufficient_data"
+
+
+class CalibrationCandidateScope(DomainModel):
+    """Exact workload scope for a candidate that cannot claim generality."""
+
+    backend_profile_id: NonEmptyStr
+    backend_version: NonEmptyStr
+    hardware_profile_id: NonEmptyStr
+    model_id: NonEmptyStr
+    model_revision: StrictStr | None
+    model_config_digest: StrictStr | None
+    inference_config: CalibrationInferenceConfig
+
+
+class CalibrationProfileCandidate(DomainModel):
+    """A human-review-only empirical reserve candidate, never an active profile."""
+
+    schema_version: Literal["v0.1"] = CALIBRATION_CANDIDATE_SCHEMA_VERSION
+    candidate_id: NonEmptyStr
+    status: CalibrationCandidateStatus
+    scope: CalibrationCandidateScope
+    comparison_record_ids: Annotated[list[NonEmptyStr], Field(min_length=1)]
+    sample_count: PositiveInt
+    additional_reserve_bytes: ByteRange
+    confidence: Confidence
+    assumptions: list[StrictStr] = Field(default_factory=list)
+    warnings: list[StrictStr] = Field(default_factory=list)
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+class CalibrationReviewStatus(StrEnum):
+    """A review decision over one immutable calibration candidate."""
+
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+
+class CalibrationReviewDecision(DomainModel):
+    """Signed human decision artifact; acceptance does not promote a profile."""
+
+    schema_version: Literal["v0.1"] = CALIBRATION_REVIEW_SCHEMA_VERSION
+    review_id: NonEmptyStr
+    candidate_id: NonEmptyStr
+    candidate_digest: NonEmptyStr
+    reviewer_id: NonEmptyStr
+    reviewed_at: datetime
+    status: CalibrationReviewStatus
+    notes: NonEmptyStr
+
+    @model_validator(mode="after")
+    def validate_reviewed_at_timezone(self) -> Self:
+        """Require a timezone-aware review time for an auditable decision."""
+        if self.reviewed_at.tzinfo is None:
+            raise ValueError("reviewed_at must include a timezone offset")
+        return self

@@ -1,14 +1,13 @@
-# Offline runtime calibration records (Phase 10a)
+# Runtime calibration
 
-Phase 10a imports a peak-memory measurement that was already collected by a
-user or external tool, then compares it to a complete KVScope feasibility
-report. It is offline analysis only: KVScope does not start a backend, run a
-benchmark, read logs, access the network, or change a backend profile.
+KVScope separates static estimates from observed runtime memory. Calibration
+artifacts are local, versioned JSON evidence; they never change an active
+backend profile automatically.
 
-## Compare a report and measurement
+## Phase 10a: compare imported measurements
 
-First retain the JSON feasibility report produced by the same static-analysis
-configuration:
+Generate a complete feasibility report, then compare it with a separately
+collected local measurement record:
 
 ```bash
 uv run kvscope analyze qwen-example \
@@ -17,67 +16,141 @@ uv run kvscope analyze qwen-example \
   --parameter-count 4000000000 \
   --context 4096 \
   --format json > report.json
-```
 
-Record a real observed peak in the versioned format, then compare only local
-files:
-
-```bash
 uv run kvscope calibrate compare \
   --report-json report.json \
   --measurement-json examples/calibration-measurement-v0.1.json \
   --format markdown
 ```
 
-`terminal`, `json`, and `markdown` are supported. JSON is the stable,
-versioned fact source (`kind: "calibration_comparison"`,
-`schema_version: "v0.1"`). The command exits with status 3 after rendering a
-structured result if the report is partial; it does not calculate a total-memory
-error in that case.
+`CalibrationMeasurement` uses positive integer bytes and preserves nullable
+unknown identity fields. The report's `provenance` is compared against model,
+backend, hardware, and inference settings. Mismatches and legacy reports
+without provenance are non-comparable; partial identity verification caps
+confidence at `medium`.
 
-## Measurement record format
+## Phase 10b: opt-in local runner
 
-`src/kvscope/schemas/calibration-record-v0.1.json` is the published schema and
-`examples/calibration-measurement-v0.1.json` is a validation-ready, redacted
-example. Every record includes:
+`kvscope calibrate run` runs only the local argv sequence declared in a
+`CalibrationRunManifest`. It calls `subprocess` with `shell=False`, requires an
+explicit timeout, and supplies the observation destination through
+`KVSCOPE_OBSERVATION_PATH`. It intentionally does not retain command output or
+environment variable values; JSON results retain command and manifest SHA-256
+digests only.
 
-- schema version, stable record ID, and timezone-aware collection timestamp;
-- backend profile ID, nullable backend version, and hardware profile ID;
-- model ID plus nullable revision and config digest;
-- context, batch/concurrency, dtype, graph-capture, and offload settings;
-- strictly positive `observed_peak_memory_bytes` (integer bytes only);
-- measurement source, method, explicit confidence, notes, and at least one
-  evidence entry.
+The external command must already be installed and must write this JSON object
+to `KVSCOPE_OBSERVATION_PATH` before exiting successfully:
 
-Use `null` for an unknown backend version, revision, digest, or note. Do not use
-`0`, an empty string, or `high` confidence to stand in for unknown information.
-When the backend version or both model revision and config digest are unknown,
-the record cannot claim `high` or `exact` confidence.
+```json
+{
+  "schema_version": "v0.1",
+  "observation_id": "local-tool-run-001",
+  "observed_at": "2026-01-01T12:00:00Z",
+  "observed_peak_memory_bytes": 123456789,
+  "evidence": [
+    {
+      "evidence_id": "tool-export-001",
+      "source_type": "local_measurement",
+      "source": "redacted local tool export"
+    }
+  ],
+  "notes": null
+}
+```
 
-## Interpreting the result
+A manifest contains an argv list, not a shell string. Relative paths are
+resolved relative to the manifest file:
 
-The comparison uses `aggregation.total_requirement`, not an individual memory
-component. It reports whether the observed peak is inside the prediction
-interval, exact signed byte deltas `observed - predicted` for lower/expected/
-upper boundaries, and an exact relative-error fraction against the expected
-boundary. Fractions are stored as integer numerator and denominator bytes, not
-binary floating point.
+```json
+{
+  "schema_version": "v0.1",
+  "run_id": "my-local-vllm-run",
+  "command": ["/absolute/path/to/my-local-observer"],
+  "observation_json_path": "observation.json",
+  "repetitions": 3,
+  "timeout_seconds": 600,
+  "working_directory": null,
+  "inherit_environment": true,
+  "environment_names": ["CUDA_VISIBLE_DEVICES"],
+  "measurement": {
+    "record_id_prefix": "my-local-vllm-run",
+    "backend_profile_id": "vllm-generic-unverified-v0",
+    "backend_version": "0.6.6",
+    "hardware_profile_id": "generic-discrete-16gib",
+    "model_id": "my-model",
+    "model_revision": "my-revision",
+    "model_config_digest": null,
+    "inference_config": {
+      "context_length": 4096,
+      "batch_size": 1,
+      "max_num_seqs": 1,
+      "active_sequences": 1,
+      "prefix_tokens": 0,
+      "multimodal_tokens": 0,
+      "weight_dtype": "fp16",
+      "kv_dtype": "fp16",
+      "graph_capture_enabled": false,
+      "cpu_offload_bytes": 0
+    },
+    "measurement_source": "local runner",
+    "measurement_method": "external observation JSON",
+    "confidence": "high",
+    "notes": null,
+    "evidence": []
+  },
+  "notes": "Run only in a controlled local environment."
+}
+```
 
-`kvscope analyze --format json` emits a frozen `provenance` object containing
-model ID/revision/config digest, backend profile/version, hardware profile, and
-the inference settings used to form the report. Calibration compares every
-known value. A mismatch is rejected without calculating an error conclusion;
-unknown optional identity values produce an explicitly `partial` verification
-and cap confidence at `medium`. Legacy reports without provenance are rejected
-as `identity_unverified`. A partial report, a report without
-`total_requirement`, or invalid local JSON is likewise explicitly rejected or
-downgraded; it never yields an optimistic conclusion.
+Run it with:
 
-## Why this does not alter profiles
+```bash
+uv run kvscope calibrate run --manifest-json run.json --format json > run-result.json
+```
 
-One peak observation is evidence, not a universal runtime model. Backend
-versions, driver/runtime state, allocator behavior, quantization artifacts,
-workload shape, and measurement tooling can all change observed memory. Phase
-10a keeps raw measurements and error analysis auditable for manual review.
-Automatic fitting, profile/reserve updates, backend launch, benchmark capture,
-log ingestion, and network collection are intentionally deferred to Phase 10b.
+Every successful sample becomes a measurement record. The selected peak is the
+maximum successful sample, not an average. Failed samples retain a non-sensitive
+failure code; a run with no successful samples exits nonzero and produces no
+measurement conclusion. KVScope cannot sandbox a user command: operators must
+enforce their own local no-network policy for the selected backend.
+
+## Scoped fitting and review
+
+Fit only comparisons that are `comparable` with `identity_verification` equal to
+`verified` and have exactly the same backend/version, hardware, model identity,
+and inference configuration:
+
+```bash
+uv run kvscope calibrate fit \
+  --comparison-json comparison-1.json \
+  --comparison-json comparison-2.json \
+  --comparison-json comparison-3.json \
+  --format json > candidate.json
+```
+
+The candidate's reserve is an exact interval of
+`max(0, observed_peak - predicted_expected_total)` across the supplied samples.
+It never attempts to identify generic backend coefficients. Fewer than three
+samples produce `insufficient_data`; that candidate cannot be accepted.
+
+A reviewer can record a decision:
+
+```bash
+uv run kvscope calibrate review \
+  --candidate-json candidate.json \
+  --reviewer alice \
+  --decision accepted \
+  --notes "Three reproducible local observations." \
+  --format json > review.json
+```
+
+An accepted review artifact binds the candidate SHA-256 digest and reviewer
+identity, but does **not** promote, overwrite, or alter any backend profile.
+Profile promotion and generalized formula fitting remain future work.
+
+## Schemas and limitations
+
+Published schemas live in `src/kvscope/schemas/`; frozen Pydantic models perform
+runtime validation without adding a JSON Schema runtime dependency. KVScope does
+not download models, execute remote model code, add inference-backend
+libraries, inspect backend logs, or automatically tune deployment settings.
