@@ -30,6 +30,7 @@ from kvscope.calibration import (
     CalibrationCandidateStatus,
     CalibrationComparisonStatus,
     compare_calibration_measurement,
+    export_calibration_measurements,
     fit_calibration_comparisons,
     load_calibration_comparison,
     load_calibration_measurement,
@@ -296,6 +297,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     calibrate_run.add_argument(
         "--manifest-json", required=True, help="Path to CalibrationRunManifest JSON"
+    )
+    calibrate_run.add_argument(
+        "--output-dir",
+        default=None,
+        help="Directory for standalone successful measurement JSON files",
     )
     calibrate_run.add_argument(
         "--format", choices=("terminal", "json", "markdown"), default="terminal"
@@ -644,6 +650,18 @@ def _handle_calibrate(parsed: argparse.Namespace) -> int:
             result = run_calibration_manifest(
                 manifest, manifest_directory=manifest_path.parent
             )
+            if parsed.output_dir is not None:
+                output_dir = Path(parsed.output_dir)
+                if not output_dir.is_absolute():
+                    output_dir = manifest_path.parent / output_dir
+                exported_paths = export_calibration_measurements(result, output_dir)
+                result = result.model_copy(
+                    update={
+                        "exported_measurement_paths": [
+                            str(path) for path in exported_paths
+                        ]
+                    }
+                )
             if parsed.format == "json":
                 print(serialize_calibration_run_json(result))
             elif parsed.format == "markdown":

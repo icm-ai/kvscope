@@ -12,7 +12,10 @@ from kvscope.calibration.loader import (
     load_calibration_run_manifest,
     load_memory_feasibility_report,
 )
-from kvscope.calibration.runner import run_calibration_manifest
+from kvscope.calibration.runner import (
+    export_calibration_measurements,
+    run_calibration_manifest,
+)
 from kvscope.calibration.schema import (
     CALIBRATION_CANDIDATE_SCHEMA_VERSION,
     CALIBRATION_COMPARISON_SCHEMA_VERSION,
@@ -60,6 +63,7 @@ __all__ = [
     "CalibrationRunResult",
     "RelativeError",
     "compare_calibration_measurement",
+    "export_calibration_measurements",
     "fit_calibration_comparisons",
     "load_calibration_comparison",
     "load_calibration_measurement",

@@ -105,7 +105,21 @@ resolved relative to the manifest file:
 Run it with:
 
 ```bash
-uv run kvscope calibrate run --manifest-json run.json --format json > run-result.json
+uv run kvscope calibrate run \
+  --manifest-json run.json \
+  --output-dir measurements \
+  --format json > run-result.json
+```
+
+`--output-dir` writes each successful sample as a standalone, versioned
+measurement JSON. Its relative path is resolved from the manifest directory;
+the runner rejects an output directory that would overwrite a prior export.
+The run result lists the exported paths, so they can be compared directly:
+
+```bash
+uv run kvscope calibrate compare \
+  --report-json report.json \
+  --measurement-json measurements/measurement-001-XXXXXXXXXXXX.json
 ```
 
 Every successful sample becomes a measurement record. The selected peak is the

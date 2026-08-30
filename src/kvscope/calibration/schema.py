@@ -156,6 +156,7 @@ class CalibrationRunResult(DomainModel):
     failures: list[CalibrationRunFailure] = Field(default_factory=list)
     selected_measurement_id: StrictStr | None
     conservative_peak_memory_bytes: PositiveInt | None
+    exported_measurement_paths: list[StrictStr] = Field(default_factory=list)
     warnings: list[StrictStr] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
 

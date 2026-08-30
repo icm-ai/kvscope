@@ -12,7 +12,9 @@ from kvscope.calibration import (
     CalibrationReviewStatus,
     CalibrationRunManifest,
     compare_calibration_measurement,
+    export_calibration_measurements,
     fit_calibration_comparisons,
+    load_calibration_measurement,
     review_calibration_candidate,
     run_calibration_manifest,
 )
@@ -173,6 +175,57 @@ def test_local_runner_collects_repeated_observations_conservatively(tmp_path) ->
     assert result.conservative_peak_memory_bytes == 250
     assert result.selected_measurement_id == "runner-test-1"
     assert "KVSCOPE_OBSERVATION_PATH" not in result.model_dump_json()
+
+    exported_paths = export_calibration_measurements(result, tmp_path / "measurements")
+    assert len(exported_paths) == 2
+    assert load_calibration_measurement(exported_paths[0]).record_id == "runner-test-1"
+    assert "runner-test-1" not in exported_paths[0].name
+    with pytest.raises(ValueError, match="would overwrite"):
+        export_calibration_measurements(result, tmp_path / "measurements")
+
+
+def test_cli_run_exports_standalone_measurements(tmp_path, capsys) -> None:
+    """The run CLI exposes exported records that feed directly into compare."""
+    observation_code = (
+        "import json, os; "
+        "open(os.environ['KVSCOPE_OBSERVATION_PATH'], 'w').write(json.dumps({"
+        "'schema_version':'v0.1','observation_id':'cli-observation',"
+        "'observed_at':'2025-01-15T12:00:00Z','observed_peak_memory_bytes':250,"
+        "'evidence':[{'evidence_id':'tool','source_type':'tool','source':'test'}],"
+        "'notes':None}))"
+    )
+    manifest = CalibrationRunManifest(
+        schema_version="v0.1",
+        run_id="cli-runner-test",
+        command=[sys.executable, "-c", observation_code],
+        observation_json_path="observation.json",
+        timeout_seconds=10,
+        working_directory=None,
+        measurement=_template(),
+        notes=None,
+    )
+    manifest_path = tmp_path / "run.json"
+    manifest_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
+
+    assert (
+        main(
+            [
+                "calibrate",
+                "run",
+                "--manifest-json",
+                str(manifest_path),
+                "--output-dir",
+                "measurements",
+                "--format",
+                "json",
+            ]
+        )
+        == 0
+    )
+    output = json.loads(capsys.readouterr().out)
+    exported = output["exported_measurement_paths"]
+    assert len(exported) == 1
+    assert load_calibration_measurement(exported[0]).record_id == "runner-test-1"
 
 
 def test_local_runner_records_nonzero_exit_without_a_measurement(tmp_path) -> None:

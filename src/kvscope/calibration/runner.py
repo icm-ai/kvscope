@@ -87,6 +87,54 @@ def _runner_environment(
     return environment
 
 
+def export_calibration_measurements(
+    result: CalibrationRunResult,
+    output_directory: str | Path,
+) -> list[Path]:
+    """Write each successful sample as a standalone, non-overwriting record JSON.
+
+    Filenames are derived from sequence position and a record-ID digest rather than
+    the record ID itself, preventing path traversal and avoiding identity leakage.
+    """
+    output_string = str(output_directory)
+    if "://" in output_string:
+        raise CalibrationRunnerError(
+            f"Measurement export directory must be local, not a URL: {output_string}",
+            code="non_local_export_directory",
+        )
+    directory = Path(output_directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    if not directory.is_dir():
+        raise CalibrationRunnerError(
+            f"Measurement export path is not a directory: {directory}",
+            code="invalid_export_directory",
+        )
+
+    exports = [
+        directory
+        / f"measurement-{index:03d}-{_canonical_digest(item.record_id)[:12]}.json"
+        for index, item in enumerate(result.successful_measurements, start=1)
+    ]
+    existing = [path for path in exports if path.exists()]
+    if existing:
+        raise CalibrationRunnerError(
+            "Measurement export would overwrite existing files; choose an empty "
+            "output directory.",
+            code="measurement_export_exists",
+        )
+    for path, measurement in zip(exports, result.successful_measurements, strict=True):
+        try:
+            with path.open("x", encoding="utf-8") as stream:
+                stream.write(measurement.model_dump_json(indent=2))
+                stream.write("\n")
+        except OSError as exc:
+            raise CalibrationRunnerError(
+                f"Measurement export failed: {exc.__class__.__name__}.",
+                code="measurement_export_failed",
+            ) from exc
+    return exports
+
+
 def run_calibration_manifest(
     manifest: CalibrationRunManifest,
     *,
@@ -242,6 +290,7 @@ def run_calibration_manifest(
         conservative_peak_memory_bytes=(
             selected.observed_peak_memory_bytes if selected is not None else None
         ),
+        exported_measurement_paths=[],
         warnings=warnings,
         evidence=[runner_evidence],
     )

@@ -62,6 +62,9 @@ def format_calibration_run_terminal(result: CalibrationRunResult) -> str:
         f"{result.conservative_peak_memory_bytes or 'N/A'} B",
         f"Command SHA-256:                 {result.command_digest}",
     ]
+    if result.exported_measurement_paths:
+        lines.extend(["", "Exported Measurements:"])
+        lines.extend(f"  - {path}" for path in result.exported_measurement_paths)
     if result.failures:
         lines.extend(["", "Failures:"])
         lines.extend(
@@ -121,6 +124,9 @@ def serialize_calibration_run_markdown(result: CalibrationRunResult) -> str:
         "- **Conservative peak**: "
         f"`{result.conservative_peak_memory_bytes or 'N/A'}` B",
     ]
+    if result.exported_measurement_paths:
+        lines.extend(["", "## Exported measurements", ""])
+        lines.extend(f"- `{path}`" for path in result.exported_measurement_paths)
     if result.failures:
         lines.extend(["", "## Failures", ""])
         lines.extend(
