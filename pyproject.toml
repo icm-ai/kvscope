@@ -39,6 +39,14 @@ kvscope = "kvscope.cli.app:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+kvscope = ["schemas/*.json", "schemas/README.md"]
+
+[tool.setuptools.data-files]
+"share/kvscope/profiles/backends" = ["profiles/backends/*.json"]
+"share/kvscope/profiles/hardware" = ["profiles/hardware/*.json"]
+"share/kvscope/profiles/models" = ["profiles/models/*.json"]
+
 [tool.pytest.ini_options]
 addopts = "-ra"
 testpaths = ["tests"]

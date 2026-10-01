@@ -6,10 +6,9 @@ from kvscope.domain.backend import BackendProfile
 from kvscope.domain.enums import ProfileStatus
 from kvscope.errors import BackendProfileError, ProfileValidationError
 from kvscope.registries.loader import parse_backend_profile, safe_load_file_content
+from kvscope.resources import default_profile_directory
 
-DEFAULT_BACKEND_PROFILES_DIR = (
-    Path(__file__).resolve().parents[3] / "profiles" / "backends"
-)
+DEFAULT_BACKEND_PROFILES_DIR = default_profile_directory("backends")
 
 
 class BackendRegistry:

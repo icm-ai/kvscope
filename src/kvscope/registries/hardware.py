@@ -6,10 +6,9 @@ from kvscope.domain.enums import ProfileStatus
 from kvscope.domain.hardware import HardwareProfile
 from kvscope.errors import HardwareProfileConflictError, ProfileValidationError
 from kvscope.registries.loader import parse_hardware_profile, safe_load_file_content
+from kvscope.resources import default_profile_directory
 
-DEFAULT_HARDWARE_PROFILES_DIR = (
-    Path(__file__).resolve().parents[3] / "profiles" / "hardware"
-)
+DEFAULT_HARDWARE_PROFILES_DIR = default_profile_directory("hardware")
 
 
 class HardwareRegistry:

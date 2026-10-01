@@ -1,42 +1,47 @@
-# KVScope (中文)
+# KVScope
 
-KVScope 是一个轻量、可解释的 LLM 推理内存估算与分析工具库，用于分析 KV Cache、模型权重、硬件内存预算以及推理框架运行时开销。
+KVScope 是一个轻量、可解释的 LLM 推理内存估算与分析工具库，用于分析模型权重、KV Cache、硬件内存预算和推理后端运行时开销，并评估部署可行性。
 
-> Phase 6 提供了 Hardware Registry、Backend Profile 版本解析、硬件内存预算计算以及基于不确定性区间（`ByteRange` / `RatioRange`）的纯公式 Runtime Overhead Engine。不下载模型权重、不执行远程代码、不依赖 PyTorch / CUDA 运行时或推理后端。
+## 当前状态
 
-## 当前支持功能
+v0.1 的静态分析核心及 Phase 10a/10b 校准流程已交付。仓库目前支持：
 
-仓库目前支持：
+- 模型、硬件和后端 profile 解析；
+- 权重、KV Cache、硬件预算和运行时开销估算，内部使用整数 bytes 并显式表达不确定性区间；
+- 内存可行性评估、约束分析、安全 context/并发上限和推荐；
+- `kvscope analyze` 端到端分析，以及 Terminal、JSON、Markdown 输出；
+- 离线校准记录导入与估算误差比较；
+- 显式 opt-in 的本地校准 runner、限定范围拟合和人工审核工件。
 
-- `resolve_model()`、`resolve_hardware_profile()`、`resolve_backend_profile()` 解析 API；
-- `estimate_weight_memory()`、`estimate_kv_cache()`、`estimate_hardware_memory_budget()`、`estimate_runtime_overhead()` 计算 API；
-- Hardware Registry 与 Backend Registry（包含 6 个通用硬件容量 Profile 及 vLLM / llama.cpp 通用模板）；
-- 硬件非模型预留拆分（OS / Display / Background / Device / User）与可分配内存 Headroom 计算；
-- 纯公式 Runtime Overhead 计算（Base Runtime, Parameter Scaled, Workspace, Graph Capture, Backend Buffers, Allocator Margin）；
-- Terminal、JSON、Markdown 序列化渲染与 `kvscope hardware`、`kvscope backend`、`kvscope estimate-overhead` CLI 命令；
-- 完整的 100% 类型注解、Ruff、mypy、Hypothesis 属性测试与 Golden Case 测试套件。
+内置 vLLM 和 llama.cpp profile 是未校准的通用规划模板，结果应在目标模型、后端版本和硬件环境中验证。校准 runner 只执行用户在 manifest 中指定的本地 argv 命令；KVScope 不下载模型、不执行远程模型代码，也不自动修改或发布 backend profile。runner 无法替操作者建立网络隔离，运行外部命令前应自行确认其安全性。
 
-InferPilot、Feasibility 最终判断、Recommendation 引擎、推理服务集成、Web UI、Benchmark 和自动调优明确不在本阶段范围内。
+Web UI、模型下载、推理服务集成、自动 profile promotion 和自动调优不在当前范围内。完整阶段状态和边界见 [实施计划](docs/IMPLEMENTATION_PLAN.md)；校准使用方法见[校准文档](docs/calibration.md)。
 
 ## 快速开始
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[dev]"
-kvscope --version
-kvscope hardware list
-kvscope backend list
-kvscope estimate-overhead --backend vllm --hardware generic-discrete-16gib --weight-bytes 14000000000 --params 7000000000
+uv sync --extra dev
+uv run kvscope --version
+uv run kvscope backend list
+uv run kvscope analyze qwen-example \
+  --hardware generic-discrete-16gib \
+  --backend vllm \
+  --parameter-count 4000000000 \
+  --context 4096 \
+  --recommend
 ```
+
+当解析到的模型配置不含参数量时，`--parameter-count` 为必需参数。使用 `--format json` 或 `--format markdown` 可输出机器可读或便于分享的报告。
+
+若要把完整 feasibility 报告与本地采集的峰值内存记录比较，请使用 `kvscope calibrate compare`。Phase 10b 的 `run`、`fit` 和 `review` 命令及其安全边界详见[校准文档](docs/calibration.md)。
 
 ## 开发质量检查
 
 ```bash
-ruff check .
-mypy src/kvscope
-pytest --cov=kvscope --cov-report=term-missing
-pre-commit run --all-files
+uv run ruff check .
+uv run mypy src/kvscope
+uv run pytest --cov=kvscope --cov-report=term-missing
+uv run pre-commit run --all-files
 ```
 
-详见 [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) 获取阶段规划，及 [CONTRIBUTING.md](CONTRIBUTING.md) 获取贡献指南。
+贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。

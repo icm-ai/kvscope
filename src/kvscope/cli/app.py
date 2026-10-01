@@ -274,7 +274,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     calibrate_parser = subparsers.add_parser(
-        "calibrate", help="Import offline measurements and analyze estimation error."
+        "calibrate",
+        help="Collect, compare, fit, and review local calibration evidence.",
     )
     calibrate_sub = calibrate_parser.add_subparsers(
         dest="action", help="Calibration action"

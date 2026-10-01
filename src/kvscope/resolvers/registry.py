@@ -1,17 +1,16 @@
 """Built-in model registry resolver."""
 
-from pathlib import Path
-
 from kvscope.errors import ModelSourceNotFoundError, RegistryValidationError
 from kvscope.registries.loader import ModelRegistry
 from kvscope.resolvers.base import RawModelConfig, ResolveContext
+from kvscope.resources import default_profile_directory
 
 
 class BuiltinRegistryResolver:
     resolver_id = "builtin_registry"
 
     def __init__(self, registry: ModelRegistry | None = None) -> None:
-        directory = Path(__file__).parents[3] / "profiles" / "models"
+        directory = default_profile_directory("models")
         self.registry = registry or ModelRegistry.from_directory(directory)
 
     def can_resolve(self, source: object) -> bool:

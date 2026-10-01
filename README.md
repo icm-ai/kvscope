@@ -3,8 +3,10 @@
 KVScope is a lightweight, explainable toolkit for estimating LLM inference
 memory, KV Cache requirements, hardware memory budgets, and backend runtime overhead.
 
-KVScope performs static, explainable memory analysis. It never downloads weights,
-executes remote model code, or starts backend runtimes.
+KVScope performs static, explainable memory analysis. It never downloads weights
+or executes remote model code. As an explicit opt-in exception, the Phase 10b
+calibration runner can execute only a user-declared local argv command; it does
+not automatically launch a backend or modify backend profiles.
 
 ## Current status
 
@@ -40,7 +42,10 @@ one. Use `--format json` or `--format markdown` to emit machine-readable or
 shareable output.
 
 To compare an existing complete JSON report with a locally collected peak-memory
-record, use `kvscope calibrate compare`; see [docs/calibration.md](docs/calibration.md).
+record, use `kvscope calibrate compare`. Phase 10b also provides an opt-in local
+runner, scoped candidate fitting, and human review artifacts. These never promote
+or modify backend profiles automatically. See [docs/calibration.md](docs/calibration.md)
+for commands, limitations, and the local runner security boundary.
 
 ## Development checks
 
