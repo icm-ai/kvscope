@@ -85,3 +85,16 @@ result = compare_deployment_targets(
 At least two targets with unique IDs are required. `model` must be a
 `ResolvedModel` and must provide a parameter count (or the caller must override
 it before comparison).
+
+## Internal assessment path
+
+The CLI `analyze` path and the comparison engine share the internal
+`engines.static_analysis` module. `prepare_static_workload` estimates resident
+weights, summarizes optional MoE metadata, and projects the inference
+configuration once for a workload. `assess_static_target` combines that bound
+preparation with one target's KV estimate, hardware budget, runtime overhead,
+provenance, and the existing `assess_memory_feasibility` engine. Comparison
+iterates the explicitly supplied targets through that target assessment; each
+sweep sample makes one workload preparation before iterating its targets.
+Recommendation generation receives the estimates from the analyze assessment
+rather than recomputing its baseline. The module keeps no cross-call cache.

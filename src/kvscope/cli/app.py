@@ -17,13 +17,10 @@ from kvscope.api import (
     RecommendationSafetyLevel,
     WeightMemoryEstimate,
     WorkloadSweepDimension,
-    analyze_moe_weight_structure,
     assess_memory_feasibility,
     compare_deployment_targets,
     estimate_hardware_memory_budget,
-    estimate_kv_cache,
     estimate_runtime_overhead,
-    estimate_weight_memory,
     generate_recommendations,
     resolve_backend_profile,
     resolve_hardware_profile,
@@ -52,16 +49,17 @@ from kvscope.domain.recommendation import (
     RuntimeRecomputeRequest,
     WeightRecomputeRequest,
 )
-from kvscope.domain.report import (
-    AnalysisInferenceConfig,
-    AnalysisProvenance,
-    MemoryFeasibilityReport,
-)
+from kvscope.domain.report import MemoryFeasibilityReport
 from kvscope.domain.runtime_overhead import RuntimeOverheadEstimate
+from kvscope.engines.static_analysis import (
+    assess_static_target,
+    prepare_static_workload,
+)
 from kvscope.errors import (
     CalibrationFitError,
     CalibrationLoadError,
     CalibrationRunnerError,
+    InvalidModelConfigError,
     KVScopeError,
 )
 from kvscope.registries.backends import get_default_backend_registry
@@ -1025,54 +1023,31 @@ def _handle_analyze(parsed: argparse.Namespace) -> int:
         multimodal_tokens=parsed.multimodal_tokens,
         graph_capture_enabled=parsed.graph_capture,
     )
-    weights = estimate_weight_memory(
-        parameter_count=model.parameter_count,
-        dtype=config.weight_dtype,
-    )
-    kv_cache = estimate_kv_cache(model, config, backend.to_spec())
-    budget = estimate_hardware_memory_budget(
-        hardware, user_reserve_bytes=parsed.user_reserve_bytes
-    )
-    runtime = estimate_runtime_overhead(
-        backend=backend,
-        hardware=hardware,
-        resident_weight_bytes=weights.resident_weight_bytes,
-        parameter_count=model.parameter_count,
-        graph_capture_enabled=config.graph_capture_enabled,
-    )
+    resolved_model = resolved_model.model_copy(update={"spec": model})
     try:
-        moe_weight_analysis = analyze_moe_weight_structure(model)
+        prepared = prepare_static_workload(resolved_model, config)
+    except InvalidModelConfigError:
+        raise
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
-    provenance = AnalysisProvenance(
-        model_id=resolved_model.source.model_id,
-        model_revision=resolved_model.source.resolved_revision,
-        model_config_digest=resolved_model.source.config_digest,
-        backend_profile_id=backend.profile_id,
-        backend_version=parsed.backend_version,
-        hardware_profile_id=hardware.profile_id,
-        inference_config=AnalysisInferenceConfig(
-            context_length=config.context_length,
-            batch_size=config.batch_size,
-            max_num_seqs=config.max_num_seqs,
-            active_sequences=config.active_sequences,
-            prefix_tokens=config.prefix_tokens,
-            multimodal_tokens=config.multimodal_tokens,
-            weight_dtype=config.weight_dtype.value,
-            kv_dtype=config.kv_dtype.value,
-            graph_capture_enabled=config.graph_capture_enabled,
-            cpu_offload_bytes=config.cpu_offload_bytes,
-        ),
-    )
-    feasibility = assess_memory_feasibility(
-        weights=weights,
-        kv_cache=kv_cache,
-        runtime_overhead=runtime,
-        hardware_budget=budget,
-        provenance=provenance,
-        moe_weight_analysis=moe_weight_analysis,
-    )
+    try:
+        assessment = assess_static_target(
+            prepared,
+            DeploymentTarget(
+                target_id=f"{hardware.profile_id}={backend.profile_id}",
+                hardware=hardware,
+                backend=backend,
+                backend_version=parsed.backend_version,
+            ),
+            user_reserve_bytes=parsed.user_reserve_bytes,
+        )
+    except ValueError as exc:
+        if exc is not prepared.moe_analysis_error:
+            raise
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    feasibility = assessment.report
 
     if not parsed.recommend:
         if parsed.format == "json":
@@ -1086,10 +1061,10 @@ def _handle_analyze(parsed: argparse.Namespace) -> int:
     recommendation_context = RecommendationContext(
         model=model,
         inference_config=config,
-        current_weight_estimate=weights,
-        current_kv_estimate=kv_cache,
-        current_runtime_estimate=runtime,
-        hardware_budget=budget,
+        current_weight_estimate=assessment.weights,
+        current_kv_estimate=assessment.kv_cache,
+        current_runtime_estimate=assessment.runtime_overhead,
+        hardware_budget=assessment.hardware_budget,
         backend_profile=backend,
         hardware_profile=hardware,
         weight_recompute_request=WeightRecomputeRequest(
@@ -1097,7 +1072,7 @@ def _handle_analyze(parsed: argparse.Namespace) -> int:
             weight_dtype=config.weight_dtype,
         ),
         runtime_recompute_request=RuntimeRecomputeRequest(
-            resident_weight_bytes=weights.resident_weight_bytes,
+            resident_weight_bytes=assessment.weights.resident_weight_bytes,
             parameter_count=model.parameter_count,
             graph_capture_enabled=config.graph_capture_enabled,
         ),

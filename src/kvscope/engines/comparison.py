@@ -2,10 +2,6 @@
 
 from collections.abc import Sequence
 
-from kvscope.calculators.hardware_budget import estimate_hardware_memory_budget
-from kvscope.calculators.kv_cache import estimate_kv_cache
-from kvscope.calculators.overhead import estimate_runtime_overhead
-from kvscope.calculators.weights import estimate_weight_memory
 from kvscope.domain.comparison import (
     DeploymentComparisonReport,
     DeploymentTarget,
@@ -13,9 +9,10 @@ from kvscope.domain.comparison import (
 )
 from kvscope.domain.config import InferenceConfig
 from kvscope.domain.model_source import ResolvedModel
-from kvscope.domain.report import AnalysisInferenceConfig, AnalysisProvenance
-from kvscope.engines.analysis import assess_memory_feasibility
-from kvscope.engines.moe import analyze_moe_weight_structure
+from kvscope.engines.static_analysis import (
+    assess_static_target,
+    prepare_static_workload,
+)
 
 
 def compare_deployment_targets(
@@ -54,59 +51,18 @@ def _evaluate_deployment_targets(
     if len(target_ids) != len(set(target_ids)):
         raise ValueError("deployment target target_id values must be unique")
 
-    model_spec = model.spec
-    if model_spec.parameter_count is None:
+    parameter_count = model.spec.parameter_count
+    if parameter_count is None:
         raise ValueError("model parameter_count is required for target comparison")
-
-    resident_weights = estimate_weight_memory(
-        parameter_count=model_spec.parameter_count,
-        dtype=inference_config.weight_dtype,
-    )
-    moe_weight_analysis = analyze_moe_weight_structure(model_spec)
-    inference_provenance = AnalysisInferenceConfig(
-        context_length=inference_config.context_length,
-        batch_size=inference_config.batch_size,
-        max_num_seqs=inference_config.max_num_seqs,
-        active_sequences=inference_config.active_sequences,
-        prefix_tokens=inference_config.prefix_tokens,
-        multimodal_tokens=inference_config.multimodal_tokens,
-        weight_dtype=inference_config.weight_dtype.value,
-        kv_dtype=inference_config.kv_dtype.value,
-        graph_capture_enabled=inference_config.graph_capture_enabled,
-        cpu_offload_bytes=inference_config.cpu_offload_bytes,
-    )
+    prepared = prepare_static_workload(model, inference_config)
+    # Comparison historically validates MoE before any target estimate.
+    if prepared.moe_analysis_error is not None:
+        raise prepared.moe_analysis_error
 
     results: list[DeploymentTargetResult] = []
     for target in targets:
-        kv_cache = estimate_kv_cache(
-            model_spec, inference_config, target.backend.to_spec()
-        )
-        hardware_budget = estimate_hardware_memory_budget(
-            target.hardware, user_reserve_bytes=user_reserve_bytes
-        )
-        runtime_overhead = estimate_runtime_overhead(
-            backend=target.backend,
-            hardware=target.hardware,
-            resident_weight_bytes=resident_weights.resident_weight_bytes,
-            parameter_count=model_spec.parameter_count,
-            graph_capture_enabled=inference_config.graph_capture_enabled,
-        )
-        provenance = AnalysisProvenance(
-            model_id=model.source.model_id,
-            model_revision=model.source.resolved_revision,
-            model_config_digest=model.source.config_digest,
-            backend_profile_id=target.backend.profile_id,
-            backend_version=target.backend_version,
-            hardware_profile_id=target.hardware.profile_id,
-            inference_config=inference_provenance,
-        )
-        report = assess_memory_feasibility(
-            weights=resident_weights,
-            kv_cache=kv_cache,
-            runtime_overhead=runtime_overhead,
-            hardware_budget=hardware_budget,
-            provenance=provenance,
-            moe_weight_analysis=moe_weight_analysis,
+        assessment = assess_static_target(
+            prepared, target, user_reserve_bytes=user_reserve_bytes
         )
         results.append(
             DeploymentTargetResult(
@@ -114,7 +70,7 @@ def _evaluate_deployment_targets(
                 hardware_profile_id=target.hardware.profile_id,
                 backend_profile_id=target.backend.profile_id,
                 backend_version=target.backend_version,
-                report=report,
+                report=assessment.report,
             )
         )
 
@@ -122,7 +78,7 @@ def _evaluate_deployment_targets(
         model_id=model.source.model_id,
         model_revision=model.source.resolved_revision,
         model_config_digest=model.source.config_digest,
-        parameter_count=model_spec.parameter_count,
+        parameter_count=parameter_count,
         inference_config=inference_config,
         targets=results,
     )
