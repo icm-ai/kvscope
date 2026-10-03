@@ -16,7 +16,9 @@ from kvscope.api import (
     RecommendationPolicy,
     RecommendationSafetyLevel,
     WeightMemoryEstimate,
+    WorkloadSweepDimension,
     assess_memory_feasibility,
+    compare_deployment_targets,
     estimate_hardware_memory_budget,
     estimate_kv_cache,
     estimate_runtime_overhead,
@@ -25,6 +27,7 @@ from kvscope.api import (
     resolve_backend_profile,
     resolve_hardware_profile,
     resolve_model,
+    sweep_workload,
 )
 from kvscope.calibration import (
     CalibrationCandidateStatus,
@@ -40,6 +43,7 @@ from kvscope.calibration import (
     review_calibration_candidate,
     run_calibration_manifest,
 )
+from kvscope.domain.comparison import DeploymentTarget
 from kvscope.domain.config import InferenceConfig
 from kvscope.domain.dtypes import KVDType, WeightDType
 from kvscope.domain.memory_budget import HardwareMemoryBudget
@@ -57,6 +61,7 @@ from kvscope.errors import (
     CalibrationFitError,
     CalibrationLoadError,
     CalibrationRunnerError,
+    KVScopeError,
 )
 from kvscope.registries.backends import get_default_backend_registry
 from kvscope.registries.hardware import get_default_hardware_registry
@@ -76,6 +81,11 @@ from kvscope.serialization.calibration_runner import (
     serialize_calibration_run_json,
     serialize_calibration_run_markdown,
 )
+from kvscope.serialization.comparison import (
+    format_deployment_comparison_terminal,
+    serialize_deployment_comparison_json,
+    serialize_deployment_comparison_markdown,
+)
 from kvscope.serialization.json import (
     serialize_budget_to_json,
     serialize_feasibility_report_json,
@@ -87,6 +97,11 @@ from kvscope.serialization.markdown import (
     serialize_feasibility_report_markdown,
     serialize_overhead_to_markdown,
     serialize_recommendation_report_markdown,
+)
+from kvscope.serialization.sweep import (
+    format_workload_sweep_terminal,
+    serialize_workload_sweep_json,
+    serialize_workload_sweep_markdown,
 )
 from kvscope.serialization.terminal import (
     format_budget_terminal,
@@ -381,6 +396,96 @@ def build_parser() -> argparse.ArgumentParser:
     analyze_parser.add_argument("--recommend", action="store_true")
     analyze_parser.add_argument("--max-candidates", type=int, default=5)
     analyze_parser.add_argument(
+        "--format", choices=("terminal", "json", "markdown"), default="terminal"
+    )
+
+    compare_parser = subparsers.add_parser(
+        "compare", help="Compare a workload across explicit hardware/backend targets."
+    )
+    compare_parser.add_argument(
+        "source", help="Model source, profile ID, or local config"
+    )
+    compare_parser.add_argument(
+        "--target",
+        action="append",
+        required=True,
+        metavar="HARDWARE=BACKEND",
+        help="Explicit hardware/backend profile pair; repeat for each target.",
+    )
+    compare_parser.add_argument("--backend-version", default=None)
+    compare_parser.add_argument("--revision", default=None)
+    compare_parser.add_argument("--offline", action="store_true")
+    compare_parser.add_argument(
+        "--parameter-count",
+        type=int,
+        default=None,
+        help="Override a missing model parameter count.",
+    )
+    compare_parser.add_argument(
+        "--weight-dtype",
+        choices=tuple(dtype.value for dtype in WeightDType),
+        default=WeightDType.FP16.value,
+    )
+    compare_parser.add_argument(
+        "--kv-dtype",
+        choices=tuple(dtype.value for dtype in KVDType),
+        default=KVDType.FP16.value,
+    )
+    compare_parser.add_argument("--context", type=int, required=True)
+    compare_parser.add_argument("--batch-size", type=int, default=1)
+    compare_parser.add_argument("--max-num-seqs", type=int, default=1)
+    compare_parser.add_argument("--prefix-tokens", type=int, default=0)
+    compare_parser.add_argument("--multimodal-tokens", type=int, default=0)
+    compare_parser.add_argument("--user-reserve-bytes", type=int, default=0)
+    compare_parser.add_argument("--graph-capture", action="store_true")
+    compare_parser.add_argument(
+        "--format", choices=("terminal", "json", "markdown"), default="terminal"
+    )
+
+    sweep_parser = subparsers.add_parser(
+        "sweep",
+        help="Sweep one workload dimension across explicit deployment targets.",
+    )
+    sweep_parser.add_argument(
+        "source", help="Model source, profile ID, or local config"
+    )
+    sweep_parser.add_argument(
+        "--target",
+        action="append",
+        required=True,
+        metavar="HARDWARE=BACKEND",
+        help="Explicit hardware/backend profile pair; repeat for each target.",
+    )
+    sweep_parser.add_argument("--backend-version", default=None)
+    sweep_parser.add_argument("--revision", default=None)
+    sweep_parser.add_argument("--offline", action="store_true")
+    sweep_parser.add_argument(
+        "--parameter-count",
+        type=int,
+        default=None,
+        help="Override a missing model parameter count.",
+    )
+    sweep_parser.add_argument(
+        "--weight-dtype",
+        choices=tuple(dtype.value for dtype in WeightDType),
+        default=WeightDType.FP16.value,
+    )
+    sweep_parser.add_argument(
+        "--kv-dtype",
+        choices=tuple(dtype.value for dtype in KVDType),
+        default=KVDType.FP16.value,
+    )
+    sweep_axis = sweep_parser.add_mutually_exclusive_group(required=True)
+    sweep_axis.add_argument("--contexts", nargs="+", type=int)
+    sweep_axis.add_argument("--active-sequences", nargs="+", type=int)
+    sweep_parser.add_argument("--context", type=int, default=None)
+    sweep_parser.add_argument("--batch-size", type=int, default=1)
+    sweep_parser.add_argument("--max-num-seqs", type=int, default=1)
+    sweep_parser.add_argument("--prefix-tokens", type=int, default=0)
+    sweep_parser.add_argument("--multimodal-tokens", type=int, default=0)
+    sweep_parser.add_argument("--user-reserve-bytes", type=int, default=0)
+    sweep_parser.add_argument("--graph-capture", action="store_true")
+    sweep_parser.add_argument(
         "--format", choices=("terminal", "json", "markdown"), default="terminal"
     )
 
@@ -716,6 +821,176 @@ def _handle_calibrate(parsed: argparse.Namespace) -> int:
         return 2
 
 
+def _resolve_deployment_targets(
+    target_specs: Sequence[str], *, backend_version: str | None
+) -> list[DeploymentTarget]:
+    """Resolve explicit target pairs and reject malformed or duplicate entries."""
+    targets: list[DeploymentTarget] = []
+    target_ids: set[str] = set()
+    for target_spec in target_specs:
+        if target_spec.count("=") != 1:
+            raise ValueError(
+                f"target must use HARDWARE=BACKEND syntax: {target_spec}"
+            )
+        hardware_id, backend_id = target_spec.split("=", maxsplit=1)
+        if not hardware_id or not backend_id:
+            raise ValueError(
+                f"target must use non-empty HARDWARE=BACKEND IDs: {target_spec}"
+            )
+        hardware = resolve_hardware_profile(
+            hardware_id, allow_deprecated=True
+        ).profile
+        backend = resolve_backend_profile(
+            backend_id,
+            version=backend_version,
+            hardware=hardware,
+            allow_deprecated=True,
+            allow_unverified=True,
+        ).profile
+        target_id = f"{hardware.profile_id}={backend.profile_id}"
+        if target_id in target_ids:
+            raise ValueError(f"duplicate deployment target: {target_id}")
+        target_ids.add(target_id)
+        targets.append(
+            DeploymentTarget(
+                target_id=target_id,
+                hardware=hardware,
+                backend=backend,
+                backend_version=backend_version,
+            )
+        )
+    return targets
+
+
+def _handle_compare(parsed: argparse.Namespace) -> int:
+    """Compare the same resolved model and workload across selected targets."""
+    resolved_model = resolve_model(
+        parsed.source, revision=parsed.revision, offline=parsed.offline
+    )
+    if parsed.parameter_count is not None:
+        resolved_model = resolved_model.model_copy(
+            update={
+                "spec": resolved_model.spec.model_copy(
+                    update={"parameter_count": parsed.parameter_count}
+                )
+            }
+        )
+    if resolved_model.spec.parameter_count is None:
+        print(
+            "Error: model parameter_count is unavailable; pass --parameter-count.",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        inference_config = InferenceConfig(
+            weight_dtype=WeightDType(parsed.weight_dtype),
+            kv_dtype=KVDType(parsed.kv_dtype),
+            context_length=parsed.context,
+            batch_size=parsed.batch_size,
+            max_num_seqs=parsed.max_num_seqs,
+            prefix_tokens=parsed.prefix_tokens,
+            multimodal_tokens=parsed.multimodal_tokens,
+            graph_capture_enabled=parsed.graph_capture,
+        )
+        targets = _resolve_deployment_targets(
+            parsed.target, backend_version=parsed.backend_version
+        )
+        report = compare_deployment_targets(
+            model=resolved_model,
+            inference_config=inference_config,
+            targets=targets,
+            user_reserve_bytes=parsed.user_reserve_bytes,
+        )
+    except (KVScopeError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    if parsed.format == "json":
+        print(serialize_deployment_comparison_json(report))
+    elif parsed.format == "markdown":
+        print(serialize_deployment_comparison_markdown(report))
+    else:
+        print(format_deployment_comparison_terminal(report))
+    return 0
+
+
+def _handle_sweep(parsed: argparse.Namespace) -> int:
+    """Run an explicit one-dimensional workload sensitivity sweep."""
+    resolved_model = resolve_model(
+        parsed.source, revision=parsed.revision, offline=parsed.offline
+    )
+    if parsed.parameter_count is not None:
+        resolved_model = resolved_model.model_copy(
+            update={
+                "spec": resolved_model.spec.model_copy(
+                    update={"parameter_count": parsed.parameter_count}
+                )
+            }
+        )
+    if resolved_model.spec.parameter_count is None:
+        print(
+            "Error: model parameter_count is unavailable; pass --parameter-count.",
+            file=sys.stderr,
+        )
+        return 2
+
+    if parsed.contexts is not None:
+        if parsed.context is not None:
+            print(
+                "Error: do not combine --context with --contexts.",
+                file=sys.stderr,
+            )
+            return 2
+        dimension = WorkloadSweepDimension.CONTEXT_LENGTH
+        values = parsed.contexts
+        base_context = values[0]
+    else:
+        if parsed.context is None:
+            print(
+                "Error: --context is required when sweeping --active-sequences.",
+                file=sys.stderr,
+            )
+            return 2
+        dimension = WorkloadSweepDimension.ACTIVE_SEQUENCES
+        values = parsed.active_sequences
+        base_context = parsed.context
+
+    try:
+        inference_config = InferenceConfig(
+            weight_dtype=WeightDType(parsed.weight_dtype),
+            kv_dtype=KVDType(parsed.kv_dtype),
+            context_length=base_context,
+            batch_size=parsed.batch_size,
+            max_num_seqs=parsed.max_num_seqs,
+            prefix_tokens=parsed.prefix_tokens,
+            multimodal_tokens=parsed.multimodal_tokens,
+            graph_capture_enabled=parsed.graph_capture,
+        )
+        targets = _resolve_deployment_targets(
+            parsed.target, backend_version=parsed.backend_version
+        )
+        report = sweep_workload(
+            model=resolved_model,
+            inference_config=inference_config,
+            targets=targets,
+            dimension=dimension,
+            values=values,
+            user_reserve_bytes=parsed.user_reserve_bytes,
+        )
+    except (KVScopeError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    if parsed.format == "json":
+        print(serialize_workload_sweep_json(report))
+    elif parsed.format == "markdown":
+        print(serialize_workload_sweep_markdown(report))
+    else:
+        print(format_workload_sweep_terminal(report))
+    return 0
+
+
 def _handle_analyze(parsed: argparse.Namespace) -> int:
     """Resolve inputs and run the complete static memory-analysis workflow."""
     resolved_model = resolve_model(
@@ -868,6 +1143,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _handle_calibrate(parsed)
     elif parsed.subcommand == "analyze":
         return _handle_analyze(parsed)
+    elif parsed.subcommand == "compare":
+        return _handle_compare(parsed)
+    elif parsed.subcommand == "sweep":
+        return _handle_sweep(parsed)
     else:
         # Backward compatibility for direct argument invocation
         if len(arguments) >= 2 and arguments[0] == "inspect-model":

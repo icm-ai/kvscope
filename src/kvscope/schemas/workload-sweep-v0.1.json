@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkloadSweepReport",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "model_id",
+    "parameter_count",
+    "dimension",
+    "points",
+    "transitions",
+    "kind"
+  ],
+  "properties": {
+    "schema_version": { "const": "v0.1" },
+    "kind": { "const": "workload_sweep" },
+    "model_id": { "type": "string", "minLength": 1 },
+    "parameter_count": { "type": "integer", "minimum": 1 },
+    "dimension": { "enum": ["context_length", "active_sequences"] },
+    "points": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["value", "comparison"],
+        "properties": {
+          "value": { "type": "integer", "minimum": 1 },
+          "comparison": { "$ref": "deployment-comparison-v0.1.json" }
+        }
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "target_id",
+          "hardware_profile_id",
+          "backend_profile_id",
+          "from_value",
+          "to_value",
+          "from_status",
+          "to_status"
+        ],
+        "properties": {
+          "target_id": { "type": "string", "minLength": 1 },
+          "hardware_profile_id": { "type": "string", "minLength": 1 },
+          "backend_profile_id": { "type": "string", "minLength": 1 },
+          "from_value": { "type": "integer", "minimum": 1 },
+          "to_value": { "type": "integer", "minimum": 1 },
+          "from_status": {
+            "enum": ["feasible", "tight", "infeasible", "unknown"]
+          },
+          "to_status": {
+            "enum": ["feasible", "tight", "infeasible", "unknown"]
+          }
+        }
+      }
+    }
+  }
+}

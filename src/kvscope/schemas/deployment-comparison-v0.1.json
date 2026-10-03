@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeploymentComparisonReport",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "model_id",
+    "model_revision",
+    "model_config_digest",
+    "parameter_count",
+    "inference_config",
+    "targets",
+    "kind"
+  ],
+  "properties": {
+    "schema_version": { "const": "v0.1" },
+    "kind": { "const": "deployment_comparison" },
+    "model_id": { "type": "string", "minLength": 1 },
+    "model_revision": { "type": ["string", "null"] },
+    "model_config_digest": { "type": ["string", "null"] },
+    "parameter_count": { "type": "integer", "minimum": 1 },
+    "inference_config": { "type": "object" },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "target_id",
+          "hardware_profile_id",
+          "backend_profile_id",
+          "backend_version",
+          "report"
+        ],
+        "properties": {
+          "target_id": { "type": "string", "minLength": 1 },
+          "hardware_profile_id": { "type": "string", "minLength": 1 },
+          "backend_profile_id": { "type": "string", "minLength": 1 },
+          "backend_version": { "type": ["string", "null"] },
+          "report": { "$ref": "feasibility-report-v0.1.json" }
+        }
+      }
+    }
+  }
+}

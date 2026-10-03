@@ -47,6 +47,11 @@ from kvscope.domain.aggregation import (
     MemoryComponentRequirement,
 )
 from kvscope.domain.backend import BackendMemoryModel, BackendProfile, BackendSpec
+from kvscope.domain.comparison import (
+    DeploymentComparisonReport,
+    DeploymentTarget,
+    DeploymentTargetResult,
+)
 from kvscope.domain.config import InferenceConfig
 from kvscope.domain.constraints import (
     ConstraintAnalysis,
@@ -111,9 +116,16 @@ from kvscope.domain.signed_ranges import (
     subtract_exact_bytes_from_range,
     subtract_range_from_exact_bytes,
 )
+from kvscope.domain.sweep import (
+    WorkloadSweepDimension,
+    WorkloadSweepPoint,
+    WorkloadSweepReport,
+    WorkloadSweepTransition,
+)
 from kvscope.domain.weight import WeightArtifactSummary
 from kvscope.engines.aggregation import aggregate_memory_requirements
 from kvscope.engines.analysis import assess_memory_feasibility
+from kvscope.engines.comparison import compare_deployment_targets
 from kvscope.engines.constraints import analyze_memory_constraints
 from kvscope.engines.context_limits import find_safe_context_limits
 from kvscope.engines.feasibility import evaluate_memory_feasibility
@@ -122,6 +134,7 @@ from kvscope.engines.recommendation_eligibility import (
 )
 from kvscope.engines.recommendations import generate_recommendations
 from kvscope.engines.sequence_limits import find_safe_active_sequence_limits
+from kvscope.engines.sweep import sweep_workload
 from kvscope.errors import (
     BackendProfileAmbiguousError,
     BackendProfileError,
@@ -207,6 +220,9 @@ __all__ = [
     "ConstraintPolicy",
     "ConstraintSeverity",
     "ContextLimitResult",
+    "DeploymentComparisonReport",
+    "DeploymentTarget",
+    "DeploymentTargetResult",
     "EstimateComponent",
     "FeasibilityEvaluationError",
     "FeasibilityResult",
@@ -280,6 +296,10 @@ __all__ = [
     "WeightArtifactSummary",
     "WeightDType",
     "WeightEstimationMethod",
+    "WorkloadSweepDimension",
+    "WorkloadSweepPoint",
+    "WorkloadSweepReport",
+    "WorkloadSweepTransition",
     "WeightMemoryEstimate",
     "WorkloadConstraints",
     "aggregate_memory_requirements",
@@ -288,6 +308,7 @@ __all__ = [
     "calculate_kv_cache",
     "calculate_memory_savings",
     "compare_calibration_measurement",
+    "compare_deployment_targets",
     "determine_recommendation_eligibility",
     "export_calibration_measurements",
     "fit_calibration_comparisons",
@@ -310,6 +331,7 @@ __all__ = [
     "run_calibration_manifest",
     "resolve_model",
     "subtract_byte_ranges",
+    "sweep_workload",
     "subtract_exact_bytes_from_range",
     "subtract_range_from_exact_bytes",
 ]

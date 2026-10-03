@@ -16,7 +16,7 @@ The repository currently provides:
 - Weight, KV cache, hardware-budget, and runtime-overhead estimates using integer bytes and explicit uncertainty intervals;
 - Feasibility assessment, constraint analysis, safe context/concurrency limits, and recommendation generation;
 - Built-in generic, unverified vLLM and llama.cpp profiles for preliminary planning;
-- Terminal, JSON, and Markdown outputs, including the end-to-end `kvscope analyze` command;
+- Terminal, JSON, and Markdown outputs, including `kvscope analyze`, multi-target `kvscope compare`, and one-axis `kvscope sweep`;
 - A Python 3.11+ `src/` layout;
 - pytest, coverage, mypy, ruff, pre-commit, and GitHub Actions configuration.
 
@@ -41,6 +41,10 @@ uv run kvscope analyze qwen-example \
 one. Use `--format json` or `--format markdown` to emit machine-readable or
 shareable output.
 
+To compare one workload across hardware/backend profile pairs, use
+`kvscope compare`; see [docs/deployment-comparison.md](docs/deployment-comparison.md).
+To inspect how context length or active sequence count changes feasibility, use
+`kvscope sweep`; see [docs/workload-sweep.md](docs/workload-sweep.md).
 To compare an existing complete JSON report with a locally collected peak-memory
 record, use `kvscope calibrate compare`. Phase 10b also provides an opt-in local
 runner, scoped candidate fitting, and human review artifacts. These never promote

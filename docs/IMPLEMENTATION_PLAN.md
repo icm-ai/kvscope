@@ -3,8 +3,9 @@
 本文档把产品和架构文档中的 v0.1 拆分为可独立验收的阶段。当前状态：
 Phase 0、1、4、5、6、7、8 已完成。原始的 Phase 2 与 Phase 3 被后续的
 Phase 5--8 重新拆分并交付；其条目保留用于追溯。Phase 9、Phase 10a 与
-Phase 10b 已完成，v0.1 的静态分析核心、离线校准导入/误差分析及受控本地采集、
-拟合/审核工件已交付；Web UI、模型下载、推理服务与自动调优仍待后续版本单独规划。
+Phase 10b、Phase 11 与 Phase 12 已完成，静态分析核心、校准工作流、多目标部署对比
+及单维 workload 敏感性扫描已交付；Web UI、模型下载、推理服务与自动调优仍待后续
+版本单独规划。
 
 ## Phase 0：Repository Bootstrap — 已完成
 
@@ -180,6 +181,26 @@ mypy、pytest 和覆盖率门禁。
 模型下载、自动调优和推理服务。外部 runner 命令的 no-network policy 由操作者的本地
 环境负责执行。
 
+## Phase 11：多目标部署静态对比 — 已完成
+
+交付内容：
+
+- `compare_deployment_targets` API 接受同一已解析模型、InferenceConfig 与显式 hardware/backend profile pairs；至少两个目标且 target ID 唯一；
+- `kvscope compare` 通过重复 `--target HARDWARE=BACKEND` 比较目标，共用 workload 与 reserve 设置，可输出 Terminal、JSON 和 Markdown；
+- 每个目标保留完整 feasibility report、身份 provenance、估算区间、置信度、约束和 warning；比较 JSON 由 `deployment-comparison-v0.1.json` 描述；
+- 输出维持用户指定顺序，不在重叠不确定区间时虚构单一赢家；不启动 backend 或执行 benchmark；
+- 单元/CLI 测试、schema 和使用文档。
+
+## Phase 12：Workload 敏感性扫描 — 已完成
+
+交付内容：
+
+- `sweep_workload` API 与 `kvscope sweep`，支持按显式值扫描 `context_length` 或 `active_sequences`，一次只变化一个维度；
+- 每个扫描点复用部署目标静态评估，可指定一个或多个硬件/backend pairs；其他 workload 参数、目标与 reserve 保持不变；
+- 按用户输入顺序输出各点及各目标的 feasibility、confidence、内存需求/余量区间、约束和 provenance；额外汇总相邻采样点之间观察到的 product-status 变化，不插值推断阈值；JSON schema 为 `workload-sweep-v0.1.json`；
+- 不隐式构造参数笛卡尔积，不搜索未指定值、不启动 backend、不 benchmark、不自动调优；
+- CLI/API 测试、Terminal/JSON/Markdown 输出和使用文档。
+
 ## 阶段依赖
 
 ```text
@@ -194,4 +215,8 @@ Phase 9 (End-to-end CLI & release readiness)
 Phase 10a (Offline calibration import & error analysis)
   ↓
 Phase 10b (Controlled local collection, scoped fit & review)
+  ↓
+Phase 11 (Multi-target static deployment comparison)
+  ↓
+Phase 12 (One-dimensional workload sensitivity sweep)
 ```

@@ -5,6 +5,11 @@ from kvscope.domain.aggregation import (
     MemoryComponentRequirement,
 )
 from kvscope.domain.backend import BackendMemoryModel, BackendProfile, BackendSpec
+from kvscope.domain.comparison import (
+    DeploymentComparisonReport,
+    DeploymentTarget,
+    DeploymentTargetResult,
+)
 from kvscope.domain.config import InferenceConfig
 from kvscope.domain.constraint import Constraint
 from kvscope.domain.constraints import (
@@ -80,6 +85,12 @@ from kvscope.domain.signed_ranges import (
     subtract_exact_bytes_from_range,
     subtract_range_from_exact_bytes,
 )
+from kvscope.domain.sweep import (
+    WorkloadSweepDimension,
+    WorkloadSweepPoint,
+    WorkloadSweepReport,
+    WorkloadSweepTransition,
+)
 from kvscope.domain.units import (
     BYTES_PER_GIB,
     BYTES_PER_MIB,
@@ -134,6 +145,9 @@ __all__ = [
     "CandidateMemoryImpact",
     "CandidateVerificationStatus",
     "ContextLimitResult",
+    "DeploymentComparisonReport",
+    "DeploymentTarget",
+    "DeploymentTargetResult",
     "ParameterChange",
     "RecommendationAction",
     "RecommendationBudgetTarget",
@@ -154,6 +168,10 @@ __all__ = [
     "TradeoffSeverity",
     "WeightDType",
     "WeightArtifactSummary",
+    "WorkloadSweepDimension",
+    "WorkloadSweepPoint",
+    "WorkloadSweepReport",
+    "WorkloadSweepTransition",
     "WorkloadConstraints",
     "add_byte_ranges",
     "bytes_to_gib",
