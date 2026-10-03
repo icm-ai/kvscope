@@ -41,3 +41,5 @@ Algebraically back-solved context limits are strictly re-verified by:
 2. Re-computing KV Cache storage via `estimate_kv_cache` / `calculate_kv_cache`.
 3. Executing Phase 7 `assess_memory_feasibility`.
 4. If verification fails, $C_{\text{max}}$ is decremented by $S_{\text{block}}$ (or 1) until target feasibility status is achieved.
+
+Each budget tier performs at most 100 forward-verification attempts. If the minimum context is reached without an accepted assessment, that tier returns no limit. A non-null allocatable-ceiling limit bypasses recommended headroom reserves; it is advisory and must not be used in production.

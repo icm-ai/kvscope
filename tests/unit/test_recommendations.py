@@ -2,6 +2,9 @@ import dataclasses
 import json
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from kvscope.api import (
     ByteRange,
@@ -45,6 +48,7 @@ from kvscope.domain.recommendation import (
     WeightRecomputeRequest,
     WorkloadConstraints,
 )
+from kvscope.engines import safe_limit_verification as safe_limit_verification
 from kvscope.engines.candidate_evaluation import (
     _determine_candidate_strength,
     _generate_candidate_id,
@@ -55,7 +59,10 @@ from kvscope.engines.candidate_generation import (
     generate_candidate_proposals,
 )
 from kvscope.engines.recommendation_ranking import rank_recommendation_candidates
-from kvscope.engines.sequence_limits import _solve_and_verify_sequence_limit
+from kvscope.engines.safe_limit_verification import (
+    BudgetTier,
+    accepted_statuses,
+)
 from kvscope.serialization.json import (
     serialize_recommendation_report_json,
 )
@@ -163,6 +170,99 @@ def test_determine_recommendation_eligibility():
     )
     low_res = determine_recommendation_eligibility(low_baseline)
     assert low_res.eligibility == RecommendationEligibility.ADVISORY_ONLY
+
+
+def test_safe_limit_results_pass_real_forward_calculators_and_assessment():
+    m, hw, bk, cfg, w, kv, rt, b = _fixture_setup()
+    ctx = RecommendationContext(
+        model=m,
+        inference_config=cfg,
+        current_weight_estimate=w,
+        current_kv_estimate=kv,
+        current_runtime_estimate=rt,
+        hardware_budget=b,
+        backend_profile=bk,
+        hardware_profile=hw,
+    )
+    policy = RecommendationPolicy()
+    before = ctx.model_dump(mode="python")
+    context_limits = find_safe_context_limits(context=ctx, policy=policy)
+    sequence_limits = find_safe_active_sequence_limits(context=ctx, policy=policy)
+    assert ctx.model_dump(mode="python") == before
+    tier_statuses = (
+        {InternalFeasibilityStatus.GUARANTEED_FEASIBLE},
+        {
+            InternalFeasibilityStatus.GUARANTEED_FEASIBLE,
+            InternalFeasibilityStatus.EXPECTED_FEASIBLE,
+        },
+        {
+            InternalFeasibilityStatus.GUARANTEED_FEASIBLE,
+            InternalFeasibilityStatus.EXPECTED_FEASIBLE,
+            InternalFeasibilityStatus.CONDITIONAL_FEASIBLE,
+        },
+    )
+
+    for candidate, accepted in zip(
+        (
+            context_limits.guaranteed_safe_max_context,
+            context_limits.expected_safe_max_context,
+            context_limits.allocatable_ceiling_max_context,
+        ),
+        tier_statuses,
+        strict=True,
+    ):
+        if candidate is None:
+            continue
+        trial = cfg.model_copy(update={"context_length": candidate})
+        trial_kv = estimate_kv_cache(model=m, config=trial, backend=bk.to_spec())
+        report = assess_memory_feasibility(
+            weights=w, kv_cache=trial_kv, runtime_overhead=rt, hardware_budget=b
+        )
+        assert report.feasibility.internal_status in accepted
+        next_trial = cfg.model_copy(update={"context_length": candidate + 16})
+        next_kv = estimate_kv_cache(
+            model=m, config=next_trial, backend=bk.to_spec()
+        )
+        next_report = assess_memory_feasibility(
+            weights=w, kv_cache=next_kv, runtime_overhead=rt, hardware_budget=b
+        )
+        assert next_report.feasibility.internal_status not in accepted
+
+    for candidate, accepted in zip(
+        (
+            sequence_limits.guaranteed_safe_max_sequences,
+            sequence_limits.expected_safe_max_sequences,
+            sequence_limits.allocatable_ceiling_max_sequences,
+        ),
+        tier_statuses,
+        strict=True,
+    ):
+        if candidate is None:
+            continue
+        trial = cfg.model_copy(
+            update={
+                "max_num_seqs": candidate,
+                "active_sequences_override": candidate,
+            }
+        )
+        trial_kv = estimate_kv_cache(model=m, config=trial, backend=bk.to_spec())
+        report = assess_memory_feasibility(
+            weights=w, kv_cache=trial_kv, runtime_overhead=rt, hardware_budget=b
+        )
+        assert report.feasibility.internal_status in accepted
+        next_trial = cfg.model_copy(
+            update={
+                "max_num_seqs": candidate + 1,
+                "active_sequences_override": candidate + 1,
+            }
+        )
+        next_kv = estimate_kv_cache(
+            model=m, config=next_trial, backend=bk.to_spec()
+        )
+        next_report = assess_memory_feasibility(
+            weights=w, kv_cache=next_kv, runtime_overhead=rt, hardware_budget=b
+        )
+        assert next_report.feasibility.internal_status not in accepted
 
 
 def test_find_safe_context_limits():
@@ -649,6 +749,40 @@ def test_context_limits_edge_branches():
     assert lim.guaranteed_safe_max_context is None  # Below min_context!
 
 
+def test_fallback_safe_limits_preserve_shared_prefix_formula_inputs():
+    m, hw, bk, cfg, w, kv, rt, b = _fixture_setup()
+    inputs = dataclasses.replace(
+        kv.formula_inputs,
+        prefix_tokens=128,
+        multimodal_tokens=64,
+        prefix_shared=True,
+    )
+    fallback_kv = dataclasses.replace(kv, formula_inputs=inputs)
+    ctx = RecommendationContext(
+        model=m,
+        inference_config=cfg.model_copy(
+            update={"prefix_tokens": 128, "multimodal_tokens": 64}
+        ),
+        current_weight_estimate=w,
+        current_kv_estimate=fallback_kv,
+        current_runtime_estimate=rt,
+        hardware_budget=b,
+        backend_profile=None,
+        hardware_profile=hw,
+    )
+    before = ctx.model_dump(mode="python")
+    context_limits = find_safe_context_limits(
+        context=ctx, policy=RecommendationPolicy()
+    )
+    sequence_limits = find_safe_active_sequence_limits(
+        context=ctx, policy=RecommendationPolicy()
+    )
+    assert context_limits.fixed_tokens == 192
+    assert sequence_limits.effective_tokens_per_sequence == 16576
+    assert ctx.model_dump(mode="python") == before
+    assert ctx.current_kv_estimate.formula_inputs.prefix_shared is True
+
+
 def test_sequence_limits_fallback_no_backend_and_no_block_size():
     m, hw, bk, cfg, w, kv, rt, b = _fixture_setup()
     kv_no_block = dataclasses.replace(
@@ -665,8 +799,10 @@ def test_sequence_limits_fallback_no_backend_and_no_block_size():
         backend_profile=None,  # Tests formula fallback path in sequence_limits.py
         hardware_profile=hw,
     )
+    original_inputs = ctx.current_kv_estimate.formula_inputs
     lim = find_safe_active_sequence_limits(context=ctx, policy=RecommendationPolicy())
     assert lim.effective_tokens_per_sequence == 16384
+    assert ctx.current_kv_estimate.formula_inputs == original_inputs
 
 
 def test_candidate_generation_feasible_and_no_backend_profile():
@@ -815,10 +951,22 @@ def test_recommendations_no_single_action_sufficient_warning():
     assert any("No single-action candidate" in w for w in report.warnings)
 
 
-def test_sequence_limit_step_down_on_initial_failure():
-    """Verify active sequence limit decrements on initial failure."""
+def test_sequence_limit_step_down_on_initial_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Public API retries each tier after its first forward assessment fails."""
 
     m, hw, bk, cfg, w, kv, rt, b = _fixture_setup()
+    expanded_budget = b.model_copy(
+        update={
+            "recommended_allocatable": ByteRange.exact(
+                b.recommended_allocatable.expected_bytes + 100_000_000_000
+            ),
+            "allocatable_before_headroom": ByteRange.exact(
+                b.allocatable_before_headroom.expected_bytes + 100_000_000_000
+            ),
+        }
+    )
 
     ctx = RecommendationContext(
         model=m,
@@ -826,13 +974,41 @@ def test_sequence_limit_step_down_on_initial_failure():
         current_weight_estimate=w,
         current_kv_estimate=kv,
         current_runtime_estimate=rt,
-        hardware_budget=b,
+        hardware_budget=expanded_budget,
         backend_profile=bk,
         hardware_profile=hw,
     )
-    pol = RecommendationPolicy()
-    lim = find_safe_active_sequence_limits(context=ctx, policy=pol)
-    assert lim.expected_safe_max_sequences is not None
+    candidates: list[int] = []
+    calls = 0
+
+    def assess(**kwargs: object) -> SimpleNamespace:
+        nonlocal calls
+        calls += 1
+        kv_estimate = kwargs["kv_cache"]
+        candidates.append(kv_estimate.formula_inputs.active_sequences)
+        status = (
+            InternalFeasibilityStatus.UNKNOWN
+            if calls % 2 == 1
+            else InternalFeasibilityStatus.GUARANTEED_FEASIBLE
+        )
+        return SimpleNamespace(
+            feasibility=SimpleNamespace(internal_status=status)
+        )
+
+    monkeypatch.setattr(
+        safe_limit_verification, "assess_memory_feasibility", assess
+    )
+    lim = find_safe_active_sequence_limits(
+        context=ctx, policy=RecommendationPolicy()
+    )
+    assert len(candidates) == 6
+    assert all(
+        candidates[offset + 1] == candidates[offset] - 1
+        for offset in (0, 2, 4)
+    )
+    assert lim.guaranteed_safe_max_sequences == candidates[1]
+    assert lim.expected_safe_max_sequences == candidates[3]
+    assert lim.allocatable_ceiling_max_sequences == candidates[5]
 
 
 def test_candidate_evaluation_strength_and_rejection_branches():
@@ -955,41 +1131,45 @@ def test_internal_candidate_evaluation_helpers():
     assert cid == "candidate-proposal"
 
 
-def test_sequence_limit_step_down_iteration():
-    m, hw_20, bk, cfg, w, kv, rt, b_20 = _fixture_setup()
-    hw_20 = HardwareProfile(
-        profile_id="gpu-20gb",
-        name="20GB GPU",
-        vendor="NVIDIA",
-        memory_topology=MemoryTopology.DISCRETE,
-        total_memory=MemoryQuantityInput(value=Decimal("20"), unit="GiB"),
-        reserves=HardwareReserveProfile(
-            os_reserve=ByteRange.exact(2 * 1024**3),
-            display_reserve=ByteRange.exact(0),
-        ),
+def test_safe_limit_budget_tiers_have_distinct_acceptance_sets():
+    assert accepted_statuses(BudgetTier.GUARANTEED) == frozenset(
+        {InternalFeasibilityStatus.GUARANTEED_FEASIBLE}
+    )
+    assert accepted_statuses(BudgetTier.EXPECTED) == frozenset(
+        {
+            InternalFeasibilityStatus.GUARANTEED_FEASIBLE,
+            InternalFeasibilityStatus.EXPECTED_FEASIBLE,
+        }
+    )
+    assert accepted_statuses(BudgetTier.CEILING) == frozenset(
+        {
+            InternalFeasibilityStatus.GUARANTEED_FEASIBLE,
+            InternalFeasibilityStatus.EXPECTED_FEASIBLE,
+            InternalFeasibilityStatus.CONDITIONAL_FEASIBLE,
+        }
     )
 
-    b_20 = estimate_hardware_memory_budget(hw_20)
 
+def test_sequence_limit_public_interface_respects_minimum_boundary():
+    m, hw, bk, cfg, w, kv, rt, b = _fixture_setup()
     ctx = RecommendationContext(
         model=m,
         inference_config=cfg.model_copy(update={"max_num_seqs": 10, "batch_size": 1}),
         current_weight_estimate=w,
         current_kv_estimate=kv,
         current_runtime_estimate=rt,
-        hardware_budget=b_20,
+        hardware_budget=b,
         backend_profile=bk,
-        hardware_profile=hw_20,
+        hardware_profile=hw,
+        workload_constraints=WorkloadConstraints(minimum_active_sequences=100),
     )
 
-    res = _solve_and_verify_sequence_limit(
-        kv_budget_bytes=50_000_000_000,
-        bytes_per_sequence=10_000_000_000,
-        min_sequences=5,
-        target_statuses={InternalFeasibilityStatus.GUARANTEED_FEASIBLE},
-        context=ctx,
+    result = find_safe_active_sequence_limits(
+        context=ctx, policy=RecommendationPolicy()
     )
-    assert res is None
+    assert result.guaranteed_safe_max_sequences is None
+    assert result.expected_safe_max_sequences is None
+    assert result.allocatable_ceiling_max_sequences is None
 
 
 def test_allocatable_exceeded_to_expected_feasible_is_required():

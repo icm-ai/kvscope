@@ -21,3 +21,5 @@ $$N_{\text{seqs,max}} = \lfloor \frac{\text{KV Budget}}{S_{\text{sequence}}} \rf
 ## Secondary Forward Verification
 
 The back-solved active sequence limit is re-verified through forward execution of `estimate_kv_cache` and `assess_memory_feasibility`. If target feasibility status is not met, the limit is decremented by 1 until verified.
+
+Each budget tier performs at most 100 forward-verification attempts. If the minimum active sequence count is reached without an accepted assessment, that tier returns no limit. A non-null allocatable-ceiling limit bypasses recommended headroom reserves; it is advisory and must not be used in production.
