@@ -8,6 +8,7 @@ from kvscope.domain.signed_ranges import SignedByteRange
 from kvscope.domain.sweep import WorkloadSweepReport
 from kvscope.domain.units import bytes_to_gib
 from kvscope.serialization.comparison import format_deployment_comparison_terminal
+from kvscope.serialization.moe import format_moe_weight_analysis_markdown
 
 
 def serialize_workload_sweep_json(report: WorkloadSweepReport, indent: int = 2) -> str:
@@ -67,11 +68,18 @@ def serialize_workload_sweep_markdown(report: WorkloadSweepReport) -> str:
         f"- Parameter count: {report.parameter_count}",
         f"- Swept dimension: `{report.dimension.value}`",
         "",
-        f"| {report.dimension.value} | Target | Hardware | Backend (version) | "
-        "Feasibility | Confidence | Requirement | Recommended headroom | "
-        "Primary constraint |",
-        "|---:|---|---|---|---|---|---:|---:|---|---|",
     ]
+    moe_analysis = report.points[0].comparison.targets[0].report.moe_weight_analysis
+    if moe_analysis is not None:
+        lines.extend([format_moe_weight_analysis_markdown(moe_analysis), ""])
+    lines.extend(
+        [
+            f"| {report.dimension.value} | Target | Hardware | Backend (version) | "
+            "Feasibility | Confidence | Requirement | Recommended headroom | "
+            "Primary constraint |",
+            "|---:|---|---|---|---|---|---:|---:|---|---|",
+        ]
+    )
     for point in report.points:
         for target in point.comparison.targets:
             feasibility = target.report.feasibility

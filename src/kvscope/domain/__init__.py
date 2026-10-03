@@ -40,6 +40,7 @@ from kvscope.domain.hardware import (
 from kvscope.domain.memory_budget import HardwareMemoryBudget
 from kvscope.domain.model import ModelSpec
 from kvscope.domain.model_source import ModelSource, ResolvedModel, ResolverAttempt
+from kvscope.domain.moe import MoEWeightAnalysis
 from kvscope.domain.ranges import (
     ByteRange,
     RatioRange,
@@ -135,6 +136,7 @@ __all__ = [
     "MemoryQuantityInput",
     "MemoryTopology",
     "ModelSpec",
+    "MoEWeightAnalysis",
     "ModelSource",
     "ProductFeasibilityStatus",
     "ProfileStatus",

@@ -10,6 +10,12 @@
   ],
   "properties": {
     "schema_version": { "type": "string" },
+    "moe_weight_analysis": {
+      "oneOf": [
+        { "$ref": "moe-weight-analysis-v0.1.json" },
+        { "type": "null" }
+      ]
+    },
     "provenance": {
       "type": ["object", "null"],
       "required": [

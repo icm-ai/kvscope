@@ -6,6 +6,7 @@ from kvscope.domain.report import MemoryFeasibilityReport
 from kvscope.domain.runtime_overhead import RuntimeOverheadEstimate
 from kvscope.domain.signed_ranges import SignedByteRange
 from kvscope.domain.units import bytes_to_gib
+from kvscope.serialization.moe import format_moe_weight_analysis_terminal
 
 
 def _format_byte_range(br: ByteRange) -> str:
@@ -138,6 +139,11 @@ def format_feasibility_report_terminal(report: MemoryFeasibilityReport) -> str:
         f"Runtime Overhead:              {ov_str}",
         f"Known Subtotal:                {sub_str}",
     ]
+
+    if report.moe_weight_analysis is not None:
+        lines.extend(
+            ["", format_moe_weight_analysis_terminal(report.moe_weight_analysis)]
+        )
 
     if agg.is_partial:
         lines.append("Total Requirement:             UNKNOWN — PARTIAL ESTIMATE")

@@ -3,9 +3,9 @@
 本文档把产品和架构文档中的 v0.1 拆分为可独立验收的阶段。当前状态：
 Phase 0、1、4、5、6、7、8 已完成。原始的 Phase 2 与 Phase 3 被后续的
 Phase 5--8 重新拆分并交付；其条目保留用于追溯。Phase 9、Phase 10a 与
-Phase 10b、Phase 11 与 Phase 12 已完成，静态分析核心、校准工作流、多目标部署对比
-及单维 workload 敏感性扫描已交付；Web UI、模型下载、推理服务与自动调优仍待后续
-版本单独规划。
+Phase 10b、Phase 11、Phase 12 与 Phase 13 已完成，静态分析核心、校准工作流、多目标
+部署对比、单维 workload 扫描和静态 MoE 参数分析已交付；Web UI、模型下载、推理服务
+与自动调优仍待后续版本单独规划。
 
 ## Phase 0：Repository Bootstrap — 已完成
 
@@ -201,6 +201,15 @@ mypy、pytest 和覆盖率门禁。
 - 不隐式构造参数笛卡尔积，不搜索未指定值、不启动 backend、不 benchmark、不自动调优；
 - CLI/API 测试、Terminal/JSON/Markdown 输出和使用文档。
 
+## Phase 13：静态 MoE 权重分析 — 已完成
+
+交付内容：
+
+- `MoEWeightAnalysis` 与 `analyze_moe_weight_structure()` 汇报总参数量、每 token 激活参数量、专家数和每 token 选中专家数；无相关元数据时报告为 `null`；
+- MoE 元数据并入 analyze/compare/sweep 的 feasibility reports，提供 JSON、Terminal 和 Markdown 展示及独立 schema；
+- resident weight estimate 始终基于总参数量；激活参数只作结构信息，不推导为显存节省或专家卸载；
+- 单元/API/CLI 测试与使用文档；不运行推理后端或 benchmark。
+
 ## 阶段依赖
 
 ```text
@@ -219,4 +228,6 @@ Phase 10b (Controlled local collection, scoped fit & review)
 Phase 11 (Multi-target static deployment comparison)
   ↓
 Phase 12 (One-dimensional workload sensitivity sweep)
+  ↓
+Phase 13 (Static MoE weight analysis)
 ```

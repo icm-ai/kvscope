@@ -7,6 +7,7 @@ from kvscope.domain.report import MemoryFeasibilityReport
 from kvscope.domain.runtime_overhead import RuntimeOverheadEstimate
 from kvscope.domain.signed_ranges import SignedByteRange
 from kvscope.domain.units import bytes_to_gib
+from kvscope.serialization.moe import format_moe_weight_analysis_markdown
 
 
 def _md_range(br: ByteRange) -> str:
@@ -164,6 +165,11 @@ def serialize_feasibility_report_markdown(report: MemoryFeasibilityReport) -> st
 
     if not agg.is_partial and agg.total_requirement is not None:
         lines.append(_row("Total Requirement", agg.total_requirement, is_bold=True))
+
+    if report.moe_weight_analysis is not None:
+        lines.extend(
+            ["", format_moe_weight_analysis_markdown(report.moe_weight_analysis), ""]
+        )
 
     tot_gib = bytes_to_gib(feas.physical_total_bytes)
     tot_row = (

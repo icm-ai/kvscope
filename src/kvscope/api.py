@@ -77,6 +77,7 @@ from kvscope.domain.hardware import (
 from kvscope.domain.memory_budget import HardwareMemoryBudget
 from kvscope.domain.model import ModelSpec
 from kvscope.domain.model_source import ModelSource, ResolvedModel, ResolverAttempt
+from kvscope.domain.moe import MoEWeightAnalysis
 from kvscope.domain.ranges import ByteRange, RatioRange
 from kvscope.domain.recommendation import (
     ActiveSequenceLimitResult,
@@ -129,6 +130,7 @@ from kvscope.engines.comparison import compare_deployment_targets
 from kvscope.engines.constraints import analyze_memory_constraints
 from kvscope.engines.context_limits import find_safe_context_limits
 from kvscope.engines.feasibility import evaluate_memory_feasibility
+from kvscope.engines.moe import analyze_moe_weight_structure
 from kvscope.engines.recommendation_eligibility import (
     determine_recommendation_eligibility,
 )
@@ -257,6 +259,7 @@ __all__ = [
     "ModelSource",
     "ModelSourceNotFoundError",
     "ModelSpec",
+    "MoEWeightAnalysis",
     "OfflineCacheMissError",
     "OptionalDependencyMissingError",
     "ParameterChange",
@@ -305,6 +308,7 @@ __all__ = [
     "aggregate_memory_requirements",
     "analyze_memory_constraints",
     "assess_memory_feasibility",
+    "analyze_moe_weight_structure",
     "calculate_kv_cache",
     "calculate_memory_savings",
     "compare_calibration_measurement",

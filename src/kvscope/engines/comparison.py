@@ -15,6 +15,7 @@ from kvscope.domain.config import InferenceConfig
 from kvscope.domain.model_source import ResolvedModel
 from kvscope.domain.report import AnalysisInferenceConfig, AnalysisProvenance
 from kvscope.engines.analysis import assess_memory_feasibility
+from kvscope.engines.moe import analyze_moe_weight_structure
 
 
 def compare_deployment_targets(
@@ -61,6 +62,7 @@ def _evaluate_deployment_targets(
         parameter_count=model_spec.parameter_count,
         dtype=inference_config.weight_dtype,
     )
+    moe_weight_analysis = analyze_moe_weight_structure(model_spec)
     inference_provenance = AnalysisInferenceConfig(
         context_length=inference_config.context_length,
         batch_size=inference_config.batch_size,
@@ -104,6 +106,7 @@ def _evaluate_deployment_targets(
             runtime_overhead=runtime_overhead,
             hardware_budget=hardware_budget,
             provenance=provenance,
+            moe_weight_analysis=moe_weight_analysis,
         )
         results.append(
             DeploymentTargetResult(

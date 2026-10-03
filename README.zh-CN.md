@@ -8,7 +8,7 @@ v0.1 的静态分析核心、Phase 10a/10b 校准、Phase 11 多目标对比和 
 
 - 模型、硬件和后端 profile 解析；
 - 权重、KV Cache、硬件预算和运行时开销估算，内部使用整数 bytes 并显式表达不确定性区间；
-- 内存可行性评估、约束分析、安全 context/并发上限和推荐；
+- 内存可行性评估、约束分析、安全 context/并发上限、推荐及静态 MoE 参数分析；
 - `kvscope analyze` 端到端分析、`kvscope compare` 多目标对比和 `kvscope sweep` 单维 workload 扫描，支持 Terminal、JSON、Markdown 输出；
 - 离线校准记录导入与估算误差比较；
 - 显式 opt-in 的本地校准 runner、限定范围拟合和人工审核工件。
@@ -33,7 +33,7 @@ uv run kvscope analyze qwen-example \
 
 当解析到的模型配置不含参数量时，`--parameter-count` 为必需参数。使用 `--format json` 或 `--format markdown` 可输出机器可读或便于分享的报告。
 
-若要对比同一 workload 在多个硬件/backend profile 组合上的可行性，请使用 `kvscope compare`，详见[多目标对比文档](docs/deployment-comparison.md)。若要观察 context 或并发数变化对内存可行性的影响，请使用 `kvscope sweep`，详见[workload 扫描文档](docs/workload-sweep.md)。若要把完整 feasibility 报告与本地采集的峰值内存记录比较，请使用 `kvscope calibrate compare`。Phase 10b 的 `run`、`fit` 和 `review` 命令及其安全边界详见[校准文档](docs/calibration.md)。
+若要对比同一 workload 在多个硬件/backend profile 组合上的可行性，请使用 `kvscope compare`，详见[多目标对比文档](docs/deployment-comparison.md)。若要观察 context 或并发数变化对内存可行性的影响，请使用 `kvscope sweep`，详见[workload 扫描文档](docs/workload-sweep.md)。MoE 分析会区分总参数与每 token 激活参数，不会把激活参数量误当作显存节省，详见[静态 MoE 权重分析](docs/moe-weight-analysis.md)。若要把完整 feasibility 报告与本地采集的峰值内存记录比较，请使用 `kvscope calibrate compare`。Phase 10b 的 `run`、`fit` 和 `review` 命令及其安全边界详见[校准文档](docs/calibration.md)。
 
 ## 开发质量检查
 

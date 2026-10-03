@@ -31,6 +31,10 @@ from kvscope.serialization.markdown import (
     serialize_feasibility_report_markdown,
     serialize_overhead_to_markdown,
 )
+from kvscope.serialization.moe import (
+    format_moe_weight_analysis_markdown,
+    format_moe_weight_analysis_terminal,
+)
 from kvscope.serialization.sweep import (
     format_workload_sweep_terminal,
     serialize_workload_sweep_json,
@@ -52,6 +56,8 @@ __all__ = [
     "format_overhead_terminal",
     "format_deployment_comparison_terminal",
     "format_workload_sweep_terminal",
+    "format_moe_weight_analysis_markdown",
+    "format_moe_weight_analysis_terminal",
     "serialize_budget_to_json",
     "serialize_budget_to_markdown",
     "serialize_calibration_comparison_json",

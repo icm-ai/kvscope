@@ -7,6 +7,10 @@ from kvscope.domain.comparison import DeploymentComparisonReport
 from kvscope.domain.ranges import ByteRange
 from kvscope.domain.signed_ranges import SignedByteRange
 from kvscope.domain.units import bytes_to_gib
+from kvscope.serialization.moe import (
+    format_moe_weight_analysis_markdown,
+    format_moe_weight_analysis_terminal,
+)
 
 
 def serialize_deployment_comparison_json(
@@ -47,6 +51,9 @@ def format_deployment_comparison_terminal(
         f"kv_dtype={report.inference_config.kv_dtype.value}",
         "",
     ]
+    moe_analysis = report.targets[0].report.moe_weight_analysis
+    if moe_analysis is not None:
+        lines.extend([format_moe_weight_analysis_terminal(moe_analysis), ""])
     for result in report.targets:
         feasibility = result.report.feasibility
         requirement = _format_range(feasibility.requirement)
@@ -88,10 +95,17 @@ def serialize_deployment_comparison_markdown(
         f"- Weight dtype: `{report.inference_config.weight_dtype.value}`",
         f"- KV dtype: `{report.inference_config.kv_dtype.value}`",
         "",
-        "| Target | Hardware | Backend (version) | Feasibility | Confidence | "
-        "Requirement | Recommended headroom | Primary constraint |",
-        "|---|---|---|---|---|---:|---:|---|",
     ]
+    moe_analysis = report.targets[0].report.moe_weight_analysis
+    if moe_analysis is not None:
+        lines.extend([format_moe_weight_analysis_markdown(moe_analysis), ""])
+    lines.extend(
+        [
+            "| Target | Hardware | Backend (version) | Feasibility | Confidence | "
+            "Requirement | Recommended headroom | Primary constraint |",
+            "|---|---|---|---|---|---:|---:|---|",
+        ]
+    )
     for result in report.targets:
         feasibility = result.report.feasibility
         primary = result.report.constraint_analysis.primary_constraint

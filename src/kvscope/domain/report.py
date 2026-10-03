@@ -16,6 +16,7 @@ from kvscope.domain.evidence import Evidence
 from kvscope.domain.feasibility import FeasibilityResult
 from kvscope.domain.hardware import HardwareSpec
 from kvscope.domain.model import ModelSpec
+from kvscope.domain.moe import MoEWeightAnalysis
 from kvscope.domain.recommendation import Recommendation
 
 
@@ -70,6 +71,7 @@ class MemoryFeasibilityReport(DomainModel):
 
     schema_version: StrictStr = "v0.1"
     provenance: AnalysisProvenance | None = None
+    moe_weight_analysis: MoEWeightAnalysis | None = None
     aggregation: MemoryAggregationResult
     feasibility: FeasibilityResult
     constraint_analysis: ConstraintAnalysis

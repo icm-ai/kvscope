@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MoEWeightAnalysis",
+  "type": "object",
+  "required": [
+    "total_parameter_count",
+    "active_parameter_count",
+    "num_experts",
+    "num_experts_per_tok",
+    "resident_weight_basis"
+  ],
+  "properties": {
+    "total_parameter_count": { "type": "integer", "minimum": 1 },
+    "active_parameter_count": { "type": ["integer", "null"], "minimum": 1 },
+    "num_experts": { "type": ["integer", "null"], "minimum": 1 },
+    "num_experts_per_tok": { "type": ["integer", "null"], "minimum": 1 },
+    "resident_weight_basis": {
+      "const": "total_parameter_count",
+      "description": "Active parameters do not reduce resident weight estimates."
+    }
+  }
+}

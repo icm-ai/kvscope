@@ -14,7 +14,7 @@ The repository currently provides:
 
 - Model, hardware, and backend profile resolution;
 - Weight, KV cache, hardware-budget, and runtime-overhead estimates using integer bytes and explicit uncertainty intervals;
-- Feasibility assessment, constraint analysis, safe context/concurrency limits, and recommendation generation;
+- Feasibility assessment, constraint analysis, safe context/concurrency limits, recommendation generation, and static MoE parameter analysis;
 - Built-in generic, unverified vLLM and llama.cpp profiles for preliminary planning;
 - Terminal, JSON, and Markdown outputs, including `kvscope analyze`, multi-target `kvscope compare`, and one-axis `kvscope sweep`;
 - A Python 3.11+ `src/` layout;
@@ -44,7 +44,9 @@ shareable output.
 To compare one workload across hardware/backend profile pairs, use
 `kvscope compare`; see [docs/deployment-comparison.md](docs/deployment-comparison.md).
 To inspect how context length or active sequence count changes feasibility, use
-`kvscope sweep`; see [docs/workload-sweep.md](docs/workload-sweep.md).
+`kvscope sweep`; see [docs/workload-sweep.md](docs/workload-sweep.md). MoE
+reports distinguish total from active parameters without treating active counts
+as resident-memory savings; see [docs/moe-weight-analysis.md](docs/moe-weight-analysis.md).
 To compare an existing complete JSON report with a locally collected peak-memory
 record, use `kvscope calibrate compare`. Phase 10b also provides an opt-in local
 runner, scoped candidate fitting, and human review artifacts. These never promote

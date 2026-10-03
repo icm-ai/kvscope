@@ -17,6 +17,7 @@ from kvscope.api import (
     RecommendationSafetyLevel,
     WeightMemoryEstimate,
     WorkloadSweepDimension,
+    analyze_moe_weight_structure,
     assess_memory_feasibility,
     compare_deployment_targets,
     estimate_hardware_memory_budget,
@@ -1039,6 +1040,11 @@ def _handle_analyze(parsed: argparse.Namespace) -> int:
         parameter_count=model.parameter_count,
         graph_capture_enabled=config.graph_capture_enabled,
     )
+    try:
+        moe_weight_analysis = analyze_moe_weight_structure(model)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
     provenance = AnalysisProvenance(
         model_id=resolved_model.source.model_id,
         model_revision=resolved_model.source.resolved_revision,
@@ -1065,6 +1071,7 @@ def _handle_analyze(parsed: argparse.Namespace) -> int:
         runtime_overhead=runtime,
         hardware_budget=budget,
         provenance=provenance,
+        moe_weight_analysis=moe_weight_analysis,
     )
 
     if not parsed.recommend:

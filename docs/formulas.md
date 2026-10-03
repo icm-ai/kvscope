@@ -36,6 +36,17 @@ FP32、FP16、BF16、FP8、INT8 和 INT4 分别使用 32、16、16、8、8 和 4
 bits/weight；也可以通过 `bits_per_weight` 使用自定义精度。所有乘法使用整数
 或精确的 `Fraction`，不使用 GiB 浮点数参与核心计算。
 
+## MoE 参数量与常驻权重
+
+MoE 报告会并列展示 `parameter_count`、`active_parameter_count`、`num_experts`
+和 `num_experts_per_tok`。常驻权重公式仍只使用总参数量：
+
+```text
+resident_weight_bytes = ceil(total_parameter_count × bits_per_weight / 8)
+```
+
+`active_parameter_count` 描述每 token 参与计算的参数，不代表其余专家权重已从设备卸载；因此不会据此缩小 resident weight estimate，也不会另行声称 active-weight VRAM。除非输入明确的专家放置/卸载模型，否则按总参数量估算全部权重常驻。完整边界见[静态 MoE 权重分析](moe-weight-analysis.md)。
+
 ## Group-wise Quantization 模式
 
 ```text
