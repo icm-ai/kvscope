@@ -394,9 +394,9 @@ def test_moe_preparation_and_provenance_projection_are_once_per_workload(
     moe_actual = static_analysis.analyze_moe_weight_structure
     moe_spy = Mock(wraps=moe_actual)
     monkeypatch.setattr(static_analysis, "analyze_moe_weight_structure", moe_spy)
-    projection_actual = static_analysis.AnalysisInferenceConfig
+    projection_actual = static_analysis.project_inference_config
     projection_spy = Mock(wraps=projection_actual)
-    monkeypatch.setattr(static_analysis, "AnalysisInferenceConfig", projection_spy)
+    monkeypatch.setattr(static_analysis, "project_inference_config", projection_spy)
 
     comparison = compare_deployment_targets(
         model=model, inference_config=config, targets=targets

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import Field, StrictBool, StrictInt, StrictStr
+from pydantic import Field, StrictStr
 
 from kvscope.domain.aggregation import MemoryAggregationResult
 from kvscope.domain.backend import BackendSpec
@@ -13,6 +13,7 @@ from kvscope.domain.constraint import Constraint
 from kvscope.domain.constraints import ConstraintAnalysis
 from kvscope.domain.estimate import MemoryEstimate
 from kvscope.domain.evidence import Evidence
+from kvscope.domain.experiment_identity import ExperimentConfigIdentity
 from kvscope.domain.feasibility import FeasibilityResult
 from kvscope.domain.hardware import HardwareSpec
 from kvscope.domain.model import ModelSpec
@@ -39,19 +40,8 @@ class AnalysisReport(DomainModel):
     evidence: list[Evidence] = Field(default_factory=list)
 
 
-class AnalysisInferenceConfig(DomainModel):
+class AnalysisInferenceConfig(ExperimentConfigIdentity):
     """Frozen runtime settings required to reproduce a feasibility report."""
-
-    context_length: Annotated[StrictInt, Field(gt=0)]
-    batch_size: Annotated[StrictInt, Field(gt=0)]
-    max_num_seqs: Annotated[StrictInt, Field(gt=0)]
-    active_sequences: Annotated[StrictInt, Field(gt=0)]
-    prefix_tokens: Annotated[StrictInt, Field(ge=0)]
-    multimodal_tokens: Annotated[StrictInt, Field(ge=0)]
-    weight_dtype: Annotated[StrictStr, Field(min_length=1)]
-    kv_dtype: Annotated[StrictStr, Field(min_length=1)]
-    graph_capture_enabled: StrictBool
-    cpu_offload_bytes: Annotated[StrictInt, Field(ge=0)]
 
 
 class AnalysisProvenance(DomainModel):

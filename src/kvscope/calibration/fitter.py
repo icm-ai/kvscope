@@ -11,7 +11,11 @@ from kvscope.calibration.schema import (
 )
 from kvscope.domain.enums import Confidence
 from kvscope.domain.evidence import Evidence
-from kvscope.domain.report import AnalysisProvenance, MemoryFeasibilityReport
+from kvscope.domain.experiment_identity import (
+    ExperimentIdentityView,
+    verify_experiment_identity,
+)
+from kvscope.domain.report import MemoryFeasibilityReport
 from kvscope.domain.signed_ranges import subtract_exact_bytes_from_range
 
 _CONFIDENCE_ORDER: dict[Confidence, int] = {
@@ -37,148 +41,6 @@ def _deduplicate_evidence(evidence: list[Evidence]) -> list[Evidence]:
             seen_ids.add(item.evidence_id)
             result.append(item)
     return result
-
-
-def _format_mismatch(
-    field_name: str, report_value: object, measurement_value: object
-) -> str:
-    """Describe one deterministic report-to-measurement identity mismatch."""
-    return (
-        f"{field_name}: report={report_value!r}, "
-        f"measurement={measurement_value!r}"
-    )
-
-
-def _verify_identity(
-    provenance: AnalysisProvenance | None,
-    measurement: CalibrationMeasurement,
-) -> tuple[CalibrationIdentityVerification, list[str], list[str]]:
-    """Compare report provenance with measurement identity without guessing."""
-    if provenance is None:
-        return (
-            CalibrationIdentityVerification.UNAVAILABLE,
-            [],
-            [
-                "The feasibility report has no provenance, so its model, backend, "
-                "hardware, and inference configuration cannot be verified."
-            ],
-        )
-
-    mismatches: list[str] = []
-    warnings: list[str] = []
-    required_values = {
-        "model_id": (provenance.model_id, measurement.model_id),
-        "backend_profile_id": (
-            provenance.backend_profile_id,
-            measurement.backend_profile_id,
-        ),
-        "hardware_profile_id": (
-            provenance.hardware_profile_id,
-            measurement.hardware_profile_id,
-        ),
-    }
-    for field_name, (report_value, measurement_value) in required_values.items():
-        if report_value != measurement_value:
-            mismatches.append(
-                _format_mismatch(field_name, report_value, measurement_value)
-            )
-
-    report_config = provenance.inference_config
-    measurement_config = measurement.inference_config
-    config_values = {
-        "context_length": (
-            report_config.context_length,
-            measurement_config.context_length,
-        ),
-        "batch_size": (report_config.batch_size, measurement_config.batch_size),
-        "max_num_seqs": (report_config.max_num_seqs, measurement_config.max_num_seqs),
-        "active_sequences": (
-            report_config.active_sequences,
-            measurement_config.active_sequences,
-        ),
-        "prefix_tokens": (
-            report_config.prefix_tokens,
-            measurement_config.prefix_tokens,
-        ),
-        "multimodal_tokens": (
-            report_config.multimodal_tokens,
-            measurement_config.multimodal_tokens,
-        ),
-        "weight_dtype": (report_config.weight_dtype, measurement_config.weight_dtype),
-        "kv_dtype": (report_config.kv_dtype, measurement_config.kv_dtype),
-        "graph_capture_enabled": (
-            report_config.graph_capture_enabled,
-            measurement_config.graph_capture_enabled,
-        ),
-        "cpu_offload_bytes": (
-            report_config.cpu_offload_bytes,
-            measurement_config.cpu_offload_bytes,
-        ),
-    }
-    for config_field_name, (
-        config_report_value,
-        config_measurement_value,
-    ) in config_values.items():
-        if config_report_value != config_measurement_value:
-            mismatches.append(
-                _format_mismatch(
-                    f"inference_config.{config_field_name}",
-                    config_report_value,
-                    config_measurement_value,
-                )
-            )
-
-    is_partial = False
-    if provenance.backend_version is None or measurement.backend_version is None:
-        is_partial = True
-        warnings.append(
-            "backend_version is unknown in the report or measurement; identity "
-            "verification is partial."
-        )
-    elif provenance.backend_version != measurement.backend_version:
-        mismatches.append(
-            _format_mismatch(
-                "backend_version",
-                provenance.backend_version,
-                measurement.backend_version,
-            )
-        )
-
-    shared_model_fingerprint = False
-    model_fingerprints = {
-        "model_revision": (provenance.model_revision, measurement.model_revision),
-        "model_config_digest": (
-            provenance.model_config_digest,
-            measurement.model_config_digest,
-        ),
-    }
-    for fingerprint_name, (
-        report_fingerprint,
-        measurement_fingerprint,
-    ) in model_fingerprints.items():
-        if report_fingerprint is None or measurement_fingerprint is None:
-            continue
-        shared_model_fingerprint = True
-        if report_fingerprint != measurement_fingerprint:
-            mismatches.append(
-                _format_mismatch(
-                    fingerprint_name,
-                    report_fingerprint,
-                    measurement_fingerprint,
-                )
-            )
-    if not shared_model_fingerprint:
-        is_partial = True
-        warnings.append(
-            "No common model revision or config digest is available; identity "
-            "verification is partial."
-        )
-
-    if mismatches:
-        return CalibrationIdentityVerification.MISMATCH, mismatches, warnings
-    if is_partial:
-        return CalibrationIdentityVerification.PARTIAL, [], warnings
-    return CalibrationIdentityVerification.VERIFIED, [], warnings
 
 
 def _non_comparable_result(
@@ -242,10 +104,33 @@ def compare_calibration_measurement(
     ]
     warnings = ["This offline comparison does not modify backend profiles or reserves."]
     evidence = _deduplicate_evidence([*measurement.evidence, *aggregation.evidence])
-    identity, mismatches, identity_warnings = _verify_identity(
-        report.provenance, measurement
+    provenance = report.provenance
+    report_identity = (
+        ExperimentIdentityView(
+            model_id=provenance.model_id,
+            backend_profile_id=provenance.backend_profile_id,
+            hardware_profile_id=provenance.hardware_profile_id,
+            inference_config=provenance.inference_config,
+            backend_version=provenance.backend_version,
+            model_revision=provenance.model_revision,
+            model_config_digest=provenance.model_config_digest,
+        )
+        if provenance is not None
+        else None
     )
-    warnings.extend(identity_warnings)
+    measurement_identity = ExperimentIdentityView(
+        model_id=measurement.model_id,
+        backend_profile_id=measurement.backend_profile_id,
+        hardware_profile_id=measurement.hardware_profile_id,
+        inference_config=measurement.inference_config,
+        backend_version=measurement.backend_version,
+        model_revision=measurement.model_revision,
+        model_config_digest=measurement.model_config_digest,
+    )
+    identity_result = verify_experiment_identity(report_identity, measurement_identity)
+    identity = CalibrationIdentityVerification(identity_result.state.value)
+    mismatches = list(identity_result.mismatches)
+    warnings.extend(identity_result.warnings)
 
     if aggregation.is_partial or aggregation.total_requirement is None:
         missing_components = ", ".join(aggregation.missing_components) or "unspecified"

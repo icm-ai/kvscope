@@ -11,6 +11,7 @@ from pydantic import Field, StrictBool, StrictInt, StrictStr, model_validator
 from kvscope.domain.base import DomainModel
 from kvscope.domain.enums import Confidence
 from kvscope.domain.evidence import Evidence
+from kvscope.domain.experiment_identity import ExperimentConfigIdentity
 from kvscope.domain.ranges import ByteRange
 from kvscope.domain.signed_ranges import SignedByteRange
 
@@ -25,19 +26,8 @@ NonNegativeInt = Annotated[StrictInt, Field(ge=0)]
 NonEmptyStr = Annotated[StrictStr, Field(min_length=1)]
 
 
-class CalibrationInferenceConfig(DomainModel):
+class CalibrationInferenceConfig(ExperimentConfigIdentity):
     """Reproducible inference settings recorded with a peak-memory measurement."""
-
-    context_length: PositiveInt
-    batch_size: PositiveInt
-    max_num_seqs: PositiveInt
-    active_sequences: PositiveInt
-    prefix_tokens: NonNegativeInt
-    multimodal_tokens: NonNegativeInt
-    weight_dtype: NonEmptyStr
-    kv_dtype: NonEmptyStr
-    graph_capture_enabled: StrictBool
-    cpu_offload_bytes: NonNegativeInt
 
 
 class CalibrationMeasurement(DomainModel):

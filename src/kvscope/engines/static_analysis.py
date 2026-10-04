@@ -8,6 +8,7 @@ from kvscope.calculators.overhead import estimate_runtime_overhead
 from kvscope.calculators.weights import WeightMemoryEstimate, estimate_weight_memory
 from kvscope.domain.comparison import DeploymentTarget
 from kvscope.domain.config import InferenceConfig
+from kvscope.domain.experiment_identity import project_inference_config
 from kvscope.domain.memory_budget import HardwareMemoryBudget
 from kvscope.domain.model_source import ResolvedModel
 from kvscope.domain.moe import MoEWeightAnalysis
@@ -64,17 +65,9 @@ def prepare_static_workload(
     except ValueError as exc:
         moe_weight_analysis = None
         moe_analysis_error = exc
-    inference_provenance = AnalysisInferenceConfig(
-        context_length=inference_config.context_length,
-        batch_size=inference_config.batch_size,
-        max_num_seqs=inference_config.max_num_seqs,
-        active_sequences=inference_config.active_sequences,
-        prefix_tokens=inference_config.prefix_tokens,
-        multimodal_tokens=inference_config.multimodal_tokens,
-        weight_dtype=inference_config.weight_dtype.value,
-        kv_dtype=inference_config.kv_dtype.value,
-        graph_capture_enabled=inference_config.graph_capture_enabled,
-        cpu_offload_bytes=inference_config.cpu_offload_bytes,
+    projected_config = project_inference_config(inference_config)
+    inference_provenance = AnalysisInferenceConfig.model_validate(
+        projected_config.model_dump()
     )
     return PreparedStaticWorkload(
         model=model,
