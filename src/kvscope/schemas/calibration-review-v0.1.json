@@ -1,0 +1,73 @@
+{
+  "$defs": {
+    "CalibrationReviewStatus": {
+      "description": "A review decision over one immutable calibration candidate.",
+      "enum": [
+        "accepted",
+        "rejected"
+      ],
+      "title": "CalibrationReviewStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Signed human decision artifact; acceptance does not promote a profile.",
+  "properties": {
+    "schema_version": {
+      "const": "v0.1",
+      "default": "v0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "review_id": {
+      "minLength": 1,
+      "title": "Review Id",
+      "type": "string"
+    },
+    "candidate_id": {
+      "minLength": 1,
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "candidate_digest": {
+      "minLength": 1,
+      "title": "Candidate Digest",
+      "type": "string"
+    },
+    "reviewer_id": {
+      "minLength": 1,
+      "title": "Reviewer Id",
+      "type": "string"
+    },
+    "reviewed_at": {
+      "format": "date-time",
+      "title": "Reviewed At",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/CalibrationReviewStatus"
+    },
+    "notes": {
+      "minLength": 1,
+      "title": "Notes",
+      "type": "string"
+    },
+    "kind": {
+      "const": "calibration_review_decision",
+      "type": "string"
+    }
+  },
+  "required": [
+    "review_id",
+    "candidate_id",
+    "candidate_digest",
+    "reviewer_id",
+    "reviewed_at",
+    "status",
+    "notes",
+    "kind"
+  ],
+  "title": "CalibrationReviewDecision",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

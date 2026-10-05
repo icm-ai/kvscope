@@ -111,8 +111,10 @@ def _report(
         memory=ByteRange.exact(1),
         confidence=Confidence.HIGH,
     )
-    total = None if partial else ByteRange(
-        lower_bytes=100, expected_bytes=200, upper_bytes=300
+    total = (
+        None
+        if partial
+        else ByteRange(lower_bytes=100, expected_bytes=200, upper_bytes=300)
     )
     aggregation = MemoryAggregationResult(
         resident_weights=component,
@@ -155,7 +157,9 @@ def _report(
 def test_loader_round_trip_preserves_nullable_unknowns(tmp_path) -> None:
     """A valid local record round-trips through strict JSON loading."""
     measurement_file = tmp_path / "measurement.json"
-    measurement_file.write_text(json.dumps(_measurement_data()), encoding="utf-8")
+    measurement_data = _measurement_data()
+    measurement_data["kind"] = "historically-ignored-discriminator"
+    measurement_file.write_text(json.dumps(measurement_data), encoding="utf-8")
 
     loaded = load_calibration_measurement(measurement_file)
 

@@ -2,8 +2,11 @@
 
 import json
 import sys
+from pathlib import Path
+from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator, FormatChecker
 
 from kvscope.calibration import (
     CalibrationCandidateStatus,
@@ -14,9 +17,22 @@ from kvscope.calibration import (
     compare_calibration_measurement,
     export_calibration_measurements,
     fit_calibration_comparisons,
+    load_calibration_comparison,
     load_calibration_measurement,
+    load_calibration_profile_candidate,
+    load_calibration_run_manifest,
     review_calibration_candidate,
     run_calibration_manifest,
+)
+from kvscope.calibration.artifacts import (
+    COMPARISON,
+    MEASUREMENT,
+    OBSERVATION,
+    PROFILE_CANDIDATE,
+    REVIEW_DECISION,
+    RUN_MANIFEST,
+    RUN_RESULT,
+    CalibrationArtifact,
 )
 from kvscope.cli.app import main
 from kvscope.domain.aggregation import (
@@ -36,8 +52,23 @@ from kvscope.domain.report import (
     AnalysisProvenance,
     MemoryFeasibilityReport,
 )
-from kvscope.errors import CalibrationFitError
+from kvscope.errors import CalibrationFitError, CalibrationLoadError
 from kvscope.serialization.calibration import serialize_calibration_comparison_json
+from kvscope.serialization.calibration_runner import (
+    serialize_calibration_profile_candidate_json,
+    serialize_calibration_review_json,
+    serialize_calibration_run_json,
+)
+
+
+def _assert_schema_valid(artifact: CalibrationArtifact[Any], instance: object) -> None:
+    """Validate a real calibration artifact against its published schema."""
+    schema_dir = Path(__file__).resolve().parents[2] / "src/kvscope/schemas"
+    schema = json.loads((schema_dir / artifact.schema_filename).read_text())
+    Draft202012Validator(schema, format_checker=FormatChecker()).validate(instance)
+
+
+assert_artifact_valid = _assert_schema_valid
 
 
 def _template() -> CalibrationMeasurementTemplate:
@@ -171,6 +202,25 @@ def test_local_runner_collects_repeated_observations_conservatively(tmp_path) ->
 
     result = run_calibration_manifest(manifest, manifest_directory=tmp_path)
 
+    assert_artifact_valid(
+        RUN_RESULT, json.loads(serialize_calibration_run_json(result))
+    )
+    assert_artifact_valid(
+        MEASUREMENT, result.successful_measurements[0].model_dump(mode="json")
+    )
+    assert_artifact_valid(
+        OBSERVATION,
+        {
+            "schema_version": "v0.1",
+            "observation_id": "sample",
+            "observed_at": "2025-01-15T12:00:00Z",
+            "observed_peak_memory_bytes": 250,
+            "evidence": [
+                {"evidence_id": "tool", "source_type": "tool", "source": "test"}
+            ],
+            "notes": None,
+        },
+    )
     assert len(result.successful_measurements) == 2
     assert result.conservative_peak_memory_bytes == 250
     assert result.selected_measurement_id == "runner-test-1"
@@ -207,6 +257,7 @@ def test_cli_run_exports_standalone_measurements(tmp_path, capsys) -> None:
     manifest_path = tmp_path / "run.json"
     manifest_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
 
+    assert_artifact_valid(RUN_MANIFEST, manifest.model_dump(mode="json"))
     assert (
         main(
             [
@@ -265,6 +316,16 @@ def test_fit_requires_verified_same_scope_and_review_never_promotes() -> None:
         notes="Samples are reproducible and within the stated scope.",
     )
 
+    assert_artifact_valid(
+        COMPARISON, json.loads(serialize_calibration_comparison_json(comparisons[0]))
+    )
+    assert_artifact_valid(
+        PROFILE_CANDIDATE,
+        json.loads(serialize_calibration_profile_candidate_json(candidate)),
+    )
+    assert_artifact_valid(
+        REVIEW_DECISION, json.loads(serialize_calibration_review_json(review))
+    )
     assert candidate.status is CalibrationCandidateStatus.SCOPED_ENVELOPE
     assert candidate.additional_reserve_bytes.upper_bytes == 60
     assert review.status is CalibrationReviewStatus.ACCEPTED
@@ -292,6 +353,42 @@ def test_fit_rejects_partial_identity_and_accepting_insufficient_data() -> None:
             status="accepted",
             notes="Not enough samples.",
         )
+
+
+def test_legacy_bare_json_and_kind_compatibility_are_preserved(tmp_path) -> None:
+    """Loaders keep legacy bare comparison/candidate and record/manifest rules."""
+    comparison = compare_calibration_measurement(_report(), _measurement("legacy", 220))
+    comparison_path = tmp_path / "comparison.json"
+    comparison_path.write_text(comparison.model_dump_json(), encoding="utf-8")
+    assert load_calibration_comparison(comparison_path) == comparison
+    comparison_path.write_text(
+        json.dumps({**json.loads(comparison.model_dump_json()), "kind": "wrong"}),
+        encoding="utf-8",
+    )
+    with pytest.raises(CalibrationLoadError) as comparison_error:
+        load_calibration_comparison(comparison_path)
+    assert comparison_error.value.code == "unexpected_artifact_kind"
+
+    candidate = fit_calibration_comparisons([comparison])
+    candidate_path = tmp_path / "candidate.json"
+    candidate_path.write_text(candidate.model_dump_json(), encoding="utf-8")
+    assert load_calibration_profile_candidate(candidate_path) == candidate
+
+    manifest = CalibrationRunManifest(
+        schema_version="v0.1",
+        run_id="legacy-manifest",
+        command=[sys.executable, "-c", "pass"],
+        observation_json_path="observation.json",
+        working_directory=None,
+        measurement=_template(),
+        notes=None,
+    )
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps({**json.loads(manifest.model_dump_json()), "kind": "ignored"}),
+        encoding="utf-8",
+    )
+    assert load_calibration_run_manifest(manifest_path) == manifest
 
 
 def test_cli_fit_emits_a_review_only_candidate(tmp_path, capsys) -> None:

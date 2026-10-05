@@ -1,31 +1,327 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "KVScope Calibration Profile Candidate v0.1",
-  "description": "A review-only scoped empirical reserve candidate; not an active backend profile.",
-  "type": "object",
+  "$defs": {
+    "ByteRange": {
+      "additionalProperties": false,
+      "description": "An interval representation of a memory size in bytes.\n\nGuarantees 0 <= lower_bytes <= expected_bytes <= upper_bytes.",
+      "properties": {
+        "lower_bytes": {
+          "minimum": 0,
+          "title": "Lower Bytes",
+          "type": "integer"
+        },
+        "expected_bytes": {
+          "minimum": 0,
+          "title": "Expected Bytes",
+          "type": "integer"
+        },
+        "upper_bytes": {
+          "minimum": 0,
+          "title": "Upper Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "lower_bytes",
+        "expected_bytes",
+        "upper_bytes"
+      ],
+      "title": "ByteRange",
+      "type": "object"
+    },
+    "CalibrationCandidateScope": {
+      "additionalProperties": false,
+      "description": "Exact workload scope for a candidate that cannot claim generality.",
+      "properties": {
+        "backend_profile_id": {
+          "minLength": 1,
+          "title": "Backend Profile Id",
+          "type": "string"
+        },
+        "backend_version": {
+          "minLength": 1,
+          "title": "Backend Version",
+          "type": "string"
+        },
+        "hardware_profile_id": {
+          "minLength": 1,
+          "title": "Hardware Profile Id",
+          "type": "string"
+        },
+        "model_id": {
+          "minLength": 1,
+          "title": "Model Id",
+          "type": "string"
+        },
+        "model_revision": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model Revision"
+        },
+        "model_config_digest": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model Config Digest"
+        },
+        "inference_config": {
+          "$ref": "#/$defs/CalibrationInferenceConfig"
+        }
+      },
+      "required": [
+        "backend_profile_id",
+        "backend_version",
+        "hardware_profile_id",
+        "model_id",
+        "model_revision",
+        "model_config_digest",
+        "inference_config"
+      ],
+      "title": "CalibrationCandidateScope",
+      "type": "object"
+    },
+    "CalibrationCandidateStatus": {
+      "description": "Readiness of a scoped empirical calibration candidate.",
+      "enum": [
+        "scoped_envelope",
+        "insufficient_data"
+      ],
+      "title": "CalibrationCandidateStatus",
+      "type": "string"
+    },
+    "CalibrationInferenceConfig": {
+      "additionalProperties": false,
+      "description": "Reproducible inference settings recorded with a peak-memory measurement.",
+      "properties": {
+        "context_length": {
+          "exclusiveMinimum": 0,
+          "title": "Context Length",
+          "type": "integer"
+        },
+        "batch_size": {
+          "exclusiveMinimum": 0,
+          "title": "Batch Size",
+          "type": "integer"
+        },
+        "max_num_seqs": {
+          "exclusiveMinimum": 0,
+          "title": "Max Num Seqs",
+          "type": "integer"
+        },
+        "active_sequences": {
+          "exclusiveMinimum": 0,
+          "title": "Active Sequences",
+          "type": "integer"
+        },
+        "prefix_tokens": {
+          "minimum": 0,
+          "title": "Prefix Tokens",
+          "type": "integer"
+        },
+        "multimodal_tokens": {
+          "minimum": 0,
+          "title": "Multimodal Tokens",
+          "type": "integer"
+        },
+        "weight_dtype": {
+          "minLength": 1,
+          "title": "Weight Dtype",
+          "type": "string"
+        },
+        "kv_dtype": {
+          "minLength": 1,
+          "title": "Kv Dtype",
+          "type": "string"
+        },
+        "graph_capture_enabled": {
+          "title": "Graph Capture Enabled",
+          "type": "boolean"
+        },
+        "cpu_offload_bytes": {
+          "minimum": 0,
+          "title": "Cpu Offload Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "context_length",
+        "batch_size",
+        "max_num_seqs",
+        "active_sequences",
+        "prefix_tokens",
+        "multimodal_tokens",
+        "weight_dtype",
+        "kv_dtype",
+        "graph_capture_enabled",
+        "cpu_offload_bytes"
+      ],
+      "title": "CalibrationInferenceConfig",
+      "type": "object"
+    },
+    "Confidence": {
+      "description": "Confidence levels for estimates and evidence-backed assumptions.",
+      "enum": [
+        "exact",
+        "high",
+        "medium",
+        "low",
+        "unknown"
+      ],
+      "title": "Confidence",
+      "type": "string"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "description": "A traceable source supporting a profile value or estimate.",
+      "properties": {
+        "evidence_id": {
+          "minLength": 1,
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "source_type": {
+          "minLength": 1,
+          "title": "Source Type",
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        },
+        "observed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed At"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "source_type",
+        "source"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
-  "required": [
-    "schema_version", "candidate_id", "status", "scope", "comparison_record_ids",
-    "sample_count", "additional_reserve_bytes", "confidence", "assumptions",
-    "warnings", "evidence"
-  ],
+  "description": "A human-review-only empirical reserve candidate, never an active profile.",
   "properties": {
-    "schema_version": { "const": "v0.1" },
-    "candidate_id": { "type": "string", "minLength": 1 },
-    "status": { "enum": ["scoped_envelope", "insufficient_data"] },
-    "scope": { "type": "object" },
+    "schema_version": {
+      "const": "v0.1",
+      "default": "v0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "candidate_id": {
+      "minLength": 1,
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/CalibrationCandidateStatus"
+    },
+    "scope": {
+      "$ref": "#/$defs/CalibrationCandidateScope"
+    },
     "comparison_record_ids": {
-      "type": "array", "minItems": 1,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Comparison Record Ids",
+      "type": "array"
     },
-    "sample_count": { "type": "integer", "exclusiveMinimum": 0 },
+    "sample_count": {
+      "exclusiveMinimum": 0,
+      "title": "Sample Count",
+      "type": "integer"
+    },
     "additional_reserve_bytes": {
-      "type": "object",
-      "required": ["lower_bytes", "expected_bytes", "upper_bytes"]
+      "$ref": "#/$defs/ByteRange"
     },
-    "confidence": { "enum": ["exact", "high", "medium", "low", "unknown"] },
-    "assumptions": { "type": "array", "items": { "type": "string" } },
-    "warnings": { "type": "array", "items": { "type": "string" } },
-    "evidence": { "type": "array", "items": { "type": "object" } }
-  }
+    "confidence": {
+      "$ref": "#/$defs/Confidence"
+    },
+    "assumptions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/Evidence"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "kind": {
+      "const": "calibration_profile_candidate",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidate_id",
+    "status",
+    "scope",
+    "comparison_record_ids",
+    "sample_count",
+    "additional_reserve_bytes",
+    "confidence"
+  ],
+  "title": "CalibrationProfileCandidate",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
 }

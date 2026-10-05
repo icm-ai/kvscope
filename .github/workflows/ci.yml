@@ -24,6 +24,12 @@ jobs:
       - name: Install project and development tools
         run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
 
+      - name: Prepare wheels for offline installation tests
+        run: |
+          wheelhouse="$RUNNER_TEMP/kvscope-install-wheels"
+          python tools/prepare_calibration_install_wheels.py --wheelhouse "$wheelhouse"
+          echo "KVSCOPE_TEST_WHEELHOUSE=$wheelhouse" >> "$GITHUB_ENV"
+
       - name: Ruff check
         run: ruff check .
 

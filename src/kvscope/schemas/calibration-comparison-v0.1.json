@@ -1,5 +1,55 @@
 {
   "$defs": {
+    "ByteRange": {
+      "additionalProperties": false,
+      "description": "An interval representation of a memory size in bytes.\n\nGuarantees 0 <= lower_bytes <= expected_bytes <= upper_bytes.",
+      "properties": {
+        "lower_bytes": {
+          "minimum": 0,
+          "title": "Lower Bytes",
+          "type": "integer"
+        },
+        "expected_bytes": {
+          "minimum": 0,
+          "title": "Expected Bytes",
+          "type": "integer"
+        },
+        "upper_bytes": {
+          "minimum": 0,
+          "title": "Upper Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "lower_bytes",
+        "expected_bytes",
+        "upper_bytes"
+      ],
+      "title": "ByteRange",
+      "type": "object"
+    },
+    "CalibrationComparisonStatus": {
+      "description": "Whether an offline comparison could be formed from the source report.",
+      "enum": [
+        "comparable",
+        "incomplete_report",
+        "identity_mismatch",
+        "identity_unverified"
+      ],
+      "title": "CalibrationComparisonStatus",
+      "type": "string"
+    },
+    "CalibrationIdentityVerification": {
+      "description": "How completely report provenance matches a measurement record.",
+      "enum": [
+        "verified",
+        "partial",
+        "mismatch",
+        "unavailable"
+      ],
+      "title": "CalibrationIdentityVerification",
+      "type": "string"
+    },
     "CalibrationInferenceConfig": {
       "additionalProperties": false,
       "description": "Reproducible inference settings recorded with a peak-memory measurement.",
@@ -69,13 +119,23 @@
       "title": "CalibrationInferenceConfig",
       "type": "object"
     },
-    "CalibrationMeasurementTemplate": {
+    "CalibrationMeasurement": {
       "additionalProperties": false,
-      "description": "Measurement metadata a local runner combines with each observation.",
+      "description": "An externally collected, local peak-memory measurement record.",
       "properties": {
-        "record_id_prefix": {
+        "schema_version": {
+          "const": "v0.1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "record_id": {
           "minLength": 1,
-          "title": "Record Id Prefix",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "collected_at": {
+          "format": "date-time",
+          "title": "Collected At",
           "type": "string"
         },
         "backend_profile_id": {
@@ -129,6 +189,11 @@
         "inference_config": {
           "$ref": "#/$defs/CalibrationInferenceConfig"
         },
+        "observed_peak_memory_bytes": {
+          "exclusiveMinimum": 0,
+          "title": "Observed Peak Memory Bytes",
+          "type": "integer"
+        },
         "measurement_source": {
           "minLength": 1,
           "title": "Measurement Source",
@@ -157,12 +222,15 @@
           "items": {
             "$ref": "#/$defs/Evidence"
           },
+          "minItems": 1,
           "title": "Evidence",
           "type": "array"
         }
       },
       "required": [
-        "record_id_prefix",
+        "schema_version",
+        "record_id",
+        "collected_at",
         "backend_profile_id",
         "backend_version",
         "hardware_profile_id",
@@ -170,12 +238,14 @@
         "model_revision",
         "model_config_digest",
         "inference_config",
+        "observed_peak_memory_bytes",
         "measurement_source",
         "measurement_method",
         "confidence",
-        "notes"
+        "notes",
+        "evidence"
       ],
-      "title": "CalibrationMeasurementTemplate",
+      "title": "CalibrationMeasurement",
       "type": "object"
     },
     "Confidence": {
@@ -254,96 +324,214 @@
       ],
       "title": "Evidence",
       "type": "object"
+    },
+    "RelativeError": {
+      "additionalProperties": false,
+      "description": "An exact signed ratio stored as integer numerator and denominator bytes.",
+      "properties": {
+        "numerator_bytes": {
+          "title": "Numerator Bytes",
+          "type": "integer"
+        },
+        "denominator_bytes": {
+          "exclusiveMinimum": 0,
+          "title": "Denominator Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "numerator_bytes",
+        "denominator_bytes"
+      ],
+      "title": "RelativeError",
+      "type": "object"
+    },
+    "SignedByteRange": {
+      "additionalProperties": false,
+      "description": "An interval representation of a memory difference in integer bytes.\n\nGuarantees lower_bytes <= expected_bytes <= upper_bytes.\nNegative values represent memory deficits; positive values represent headroom.",
+      "properties": {
+        "lower_bytes": {
+          "title": "Lower Bytes",
+          "type": "integer"
+        },
+        "expected_bytes": {
+          "title": "Expected Bytes",
+          "type": "integer"
+        },
+        "upper_bytes": {
+          "title": "Upper Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "lower_bytes",
+        "expected_bytes",
+        "upper_bytes"
+      ],
+      "title": "SignedByteRange",
+      "type": "object"
     }
   },
   "additionalProperties": false,
-  "description": "Explicit local command contract for a repeatable calibration run.",
+  "description": "Auditable comparison of one observed peak against a feasibility report.",
   "properties": {
     "schema_version": {
       "const": "v0.1",
+      "default": "v0.1",
       "title": "Schema Version",
       "type": "string"
     },
-    "run_id": {
+    "status": {
+      "$ref": "#/$defs/CalibrationComparisonStatus"
+    },
+    "measurement_record_id": {
       "minLength": 1,
-      "title": "Run Id",
+      "title": "Measurement Record Id",
       "type": "string"
     },
-    "command": {
-      "items": {
-        "minLength": 1,
-        "type": "string"
-      },
-      "minItems": 1,
-      "title": "Command",
-      "type": "array"
-    },
-    "observation_json_path": {
+    "report_schema_version": {
       "minLength": 1,
-      "title": "Observation Json Path",
+      "title": "Report Schema Version",
       "type": "string"
-    },
-    "repetitions": {
-      "default": 1,
-      "exclusiveMinimum": 0,
-      "title": "Repetitions",
-      "type": "integer"
-    },
-    "timeout_seconds": {
-      "default": 300,
-      "exclusiveMinimum": 0,
-      "title": "Timeout Seconds",
-      "type": "integer"
-    },
-    "working_directory": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Working Directory"
-    },
-    "inherit_environment": {
-      "default": true,
-      "title": "Inherit Environment",
-      "type": "boolean"
-    },
-    "environment_names": {
-      "items": {
-        "minLength": 1,
-        "type": "string"
-      },
-      "title": "Environment Names",
-      "type": "array"
     },
     "measurement": {
-      "$ref": "#/$defs/CalibrationMeasurementTemplate"
+      "$ref": "#/$defs/CalibrationMeasurement"
     },
-    "notes": {
+    "identity_verification": {
+      "$ref": "#/$defs/CalibrationIdentityVerification"
+    },
+    "identity_mismatches": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Identity Mismatches",
+      "type": "array"
+    },
+    "predicted_total_requirement": {
       "anyOf": [
         {
-          "type": "string"
+          "$ref": "#/$defs/ByteRange"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "observed_peak_memory_bytes": {
+      "exclusiveMinimum": 0,
+      "title": "Observed Peak Memory Bytes",
+      "type": "integer"
+    },
+    "observed_within_predicted_range": {
+      "anyOf": [
+        {
+          "type": "boolean"
         },
         {
           "type": "null"
         }
       ],
-      "title": "Notes"
+      "title": "Observed Within Predicted Range"
+    },
+    "delta_vs_lower_bytes": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Delta Vs Lower Bytes"
+    },
+    "delta_vs_expected_bytes": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Delta Vs Expected Bytes"
+    },
+    "delta_vs_upper_bytes": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Delta Vs Upper Bytes"
+    },
+    "signed_error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SignedByteRange"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "relative_error_vs_expected": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RelativeError"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "confidence": {
+      "$ref": "#/$defs/Confidence"
+    },
+    "assumptions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/Evidence"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "kind": {
+      "const": "calibration_comparison",
+      "type": "string"
     }
   },
   "required": [
-    "schema_version",
-    "run_id",
-    "command",
-    "observation_json_path",
-    "working_directory",
+    "status",
+    "measurement_record_id",
+    "report_schema_version",
     "measurement",
-    "notes"
+    "identity_verification",
+    "predicted_total_requirement",
+    "observed_peak_memory_bytes",
+    "observed_within_predicted_range",
+    "delta_vs_lower_bytes",
+    "delta_vs_expected_bytes",
+    "delta_vs_upper_bytes",
+    "signed_error",
+    "relative_error_vs_expected",
+    "confidence"
   ],
-  "title": "CalibrationRunManifest",
+  "title": "CalibrationComparison",
   "type": "object",
   "$schema": "https://json-schema.org/draft/2020-12/schema"
 }

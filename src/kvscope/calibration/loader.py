@@ -8,6 +8,14 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from kvscope.calibration.artifacts import (
+    COMPARISON,
+    MEASUREMENT,
+    PROFILE_CANDIDATE,
+    RUN_MANIFEST,
+    CalibrationArtifact,
+    apply_loader_kind,
+)
 from kvscope.calibration.schema import (
     CalibrationComparison,
     CalibrationMeasurement,
@@ -59,20 +67,21 @@ def _load_model(
     path: str | Path,
     *,
     label: str,
-    model_type: type[ArtifactModel],
-    expected_kind: str | None = None,
+    artifact: CalibrationArtifact[ArtifactModel],
     schema_name: str | None = None,
 ) -> ArtifactModel:
-    """Load one Pydantic artifact, optionally validating serializer kind."""
+    """Load one Pydantic artifact using its centralized kind policy."""
     data = _read_local_json(path, label=label)
-    kind = data.pop("kind", None)
-    if expected_kind is not None and kind is not None and kind != expected_kind:
+    try:
+        apply_loader_kind(data, artifact)
+    except ValueError as exc:
+        expected_kind = str(exc)
         raise CalibrationLoadError(
             f"{label} has unexpected kind; expected {expected_kind!r}.",
             code="unexpected_artifact_kind",
-        )
+        ) from exc
     try:
-        return model_type.model_validate(data)
+        return artifact.model_type.model_validate(data)
     except ValidationError as exc:
         raise CalibrationLoadError(
             f"{label} does not match {schema_name or 'its v0.1 schema'}: {exc}",
@@ -85,8 +94,8 @@ def load_calibration_measurement(path: str | Path) -> CalibrationMeasurement:
     return _load_model(
         path,
         label="Calibration measurement",
-        model_type=CalibrationMeasurement,
-        schema_name="calibration-record-v0.1.json",
+        artifact=MEASUREMENT,
+        schema_name=MEASUREMENT.schema_filename,
     )
 
 
@@ -95,7 +104,7 @@ def load_calibration_run_manifest(path: str | Path) -> CalibrationRunManifest:
     return _load_model(
         path,
         label="Calibration run manifest",
-        model_type=CalibrationRunManifest,
+        artifact=RUN_MANIFEST,
     )
 
 
@@ -104,8 +113,7 @@ def load_calibration_comparison(path: str | Path) -> CalibrationComparison:
     return _load_model(
         path,
         label="Calibration comparison",
-        model_type=CalibrationComparison,
-        expected_kind="calibration_comparison",
+        artifact=COMPARISON,
     )
 
 
@@ -114,8 +122,7 @@ def load_calibration_profile_candidate(path: str | Path) -> CalibrationProfileCa
     return _load_model(
         path,
         label="Calibration profile candidate",
-        model_type=CalibrationProfileCandidate,
-        expected_kind="calibration_profile_candidate",
+        artifact=PROFILE_CANDIDATE,
     )
 
 

@@ -1,10 +1,11 @@
 """Serialization of Phase 10b local runner, fit, and review artifacts."""
 
-import json
-from typing import Any
-
-from pydantic import BaseModel
-
+from kvscope.calibration.artifacts import (
+    PROFILE_CANDIDATE,
+    REVIEW_DECISION,
+    RUN_RESULT,
+    serialize_artifact_json,
+)
 from kvscope.calibration.schema import (
     CalibrationProfileCandidate,
     CalibrationReviewDecision,
@@ -14,32 +15,25 @@ from kvscope.domain.ranges import ByteRange
 from kvscope.domain.units import bytes_to_gib
 
 
-def _serialize(model: BaseModel, *, kind: str, indent: int) -> str:
-    """Serialize one frozen artifact with a stable kind discriminator."""
-    data: dict[str, Any] = json.loads(model.model_dump_json())
-    data["kind"] = kind
-    return json.dumps(data, ensure_ascii=False, indent=indent)
-
-
 def serialize_calibration_run_json(
     result: CalibrationRunResult, indent: int = 2
 ) -> str:
     """Serialize a local runner result as JSON facts."""
-    return _serialize(result, kind="calibration_run_result", indent=indent)
+    return serialize_artifact_json(result, RUN_RESULT, indent)
 
 
 def serialize_calibration_profile_candidate_json(
     candidate: CalibrationProfileCandidate, indent: int = 2
 ) -> str:
     """Serialize a review-only empirical candidate as JSON facts."""
-    return _serialize(candidate, kind="calibration_profile_candidate", indent=indent)
+    return serialize_artifact_json(candidate, PROFILE_CANDIDATE, indent)
 
 
 def serialize_calibration_review_json(
     review: CalibrationReviewDecision, indent: int = 2
 ) -> str:
     """Serialize a human review artifact as JSON facts."""
-    return _serialize(review, kind="calibration_review_decision", indent=indent)
+    return serialize_artifact_json(review, REVIEW_DECISION, indent)
 
 
 def _format_range(value: ByteRange) -> str:

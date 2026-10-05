@@ -1,28 +1,19 @@
 """Serialization of versioned offline calibration comparisons."""
 
-import json
 from decimal import Decimal
-from typing import Any
 
+from kvscope.calibration.artifacts import COMPARISON, serialize_artifact_json
 from kvscope.calibration.schema import CalibrationComparison
 from kvscope.domain.ranges import ByteRange
 from kvscope.domain.signed_ranges import SignedByteRange
 from kvscope.domain.units import BYTES_PER_GIB, bytes_to_gib
 
 
-def _dump_comparison(comparison: CalibrationComparison) -> dict[str, Any]:
-    """Return the stable JSON facts for a calibration comparison."""
-    data = json.loads(comparison.model_dump_json())
-    assert isinstance(data, dict)
-    data["kind"] = "calibration_comparison"
-    return data
-
-
 def serialize_calibration_comparison_json(
     comparison: CalibrationComparison, indent: int = 2
 ) -> str:
     """Serialize a calibration comparison as versioned JSON facts."""
-    return json.dumps(_dump_comparison(comparison), ensure_ascii=False, indent=indent)
+    return serialize_artifact_json(comparison, COMPARISON, indent)
 
 
 def _format_range(memory: ByteRange) -> str:

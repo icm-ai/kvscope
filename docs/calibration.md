@@ -164,7 +164,68 @@ Profile promotion and generalized formula fitting remain future work.
 
 ## Schemas and limitations
 
-Published schemas live in `src/kvscope/schemas/`; frozen Pydantic models perform
-runtime validation without adding a JSON Schema runtime dependency. KVScope does
-not download models, execute remote model code, add inference-backend
-libraries, inspect backend logs, or automatically tune deployment settings.
+Seven independent Draft 2020-12 schemas cover measurement record, runner
+manifest, observation, comparison, runner result, profile candidate, and review
+artifacts. Their filenames, Pydantic models, output kinds, and kind-compatibility
+policies are declared together in the finite internal
+`kvscope.calibration.artifacts` contract. The runner manifest schema is not a
+run-result schema. Nested models use local `$defs`; schema files are generated
+from Pydantic validation models with `python tools/generate_calibration_schemas.py`
+and verified with `python tools/generate_calibration_schemas.py --check`.
+
+Canonical JSON adds `kind` only for comparison, run result, candidate, and review.
+Comparison/candidate require the discriminator only when it is present, because
+legacy bare-model JSON remains loadable; run-result/review output schemas require
+it. Record/manifest/observation canonical representations do not have a kind.
+For compatibility, the public record and manifest loaders continue removing an
+arbitrary supplied kind without checking its value. Comparison/candidate loaders
+also preserve legacy acceptance of explicit `kind: null`; their canonical schemas
+allow omitted kind but reject null kind. Therefore canonical schema validation and
+historical loader acceptance are intentionally not identical.
+No public observation, run-result, or review loader is introduced.
+
+The frozen Pydantic models remain runtime validation authority; `jsonschema` is
+development/test-only. Static schemas describe required/defaulted and nullable
+fields, exact integer-byte fields, enums, and nested types, but do not fully
+express custom checks such as timezone-aware timestamps, confidence constraints
+for unknown identity, ordered range invariants, or the fit/review policy across
+artifacts. JSON Schema integer behavior is not claimed to be equivalent to
+Pydantic `StrictInt` for all numeric representations. KVScope does not download
+models, execute remote model code, add inference-backend libraries, inspect
+backend logs, or automatically tune deployment settings.
+
+## Offline installation tests
+
+The existing backend version resolver uses `packaging`, so it is a declared
+lightweight runtime dependency alongside Pydantic. `jsonschema` and
+`rfc3339-validator` are dev-only: the latter enables the optional `date-time`
+FormatChecker instead of silently leaving that format unchecked. Runtime Pydantic
+validation remains authoritative even when schema format checking is enabled.
+
+Before full pytest, prepare dependency wheels using a pip-equipped interpreter
+with the same Python minor version and platform as the test interpreter:
+
+```bash
+export KVSCOPE_TEST_WHEELHOUSE="$(mktemp -d)"
+python tools/prepare_calibration_install_wheels.py \
+  --wheelhouse "$KVSCOPE_TEST_WHEELHOUSE"
+pytest --cov=kvscope --cov-report=term-missing --cov-report=json
+```
+
+For a uv environment without pip, use `uv run --with pip python` for the
+preparation command. Preparation may use an explicitly permitted ordinary package
+index, or `--no-index --find-links /path/to/cached-wheels`. It reads runtime/build
+requirements from `pyproject.toml` and stages `wheel` for older setuptools; it does
+not download optional Hugging Face or inference extras. CI runs this preparation
+as a separate step.
+
+`tests/integration/test_calibration_install.py` always participates in full pytest.
+It builds and installs using `--no-index` into fresh, non-system, noneditable venvs,
+then runs the installed console script outside the source checkout. Missing wheels
+are a hard failure, not a skip or source-import fallback. It proves installed
+schema/profile resources, the three-record analyze/run/compare/fit/review chain,
+integer reserve envelope, candidate digest binding, unchanged profile tree,
+legacy/null-kind compatibility, and key runner/fit/review failures. Subprocess
+stdout, stderr, JSON facts and exit codes live in pytest's temporary
+`calibration-install*/outside-source` directory; use `--basetemp /new/evidence/path`
+to retain a task-specific evidence location.

@@ -69,13 +69,23 @@
       "title": "CalibrationInferenceConfig",
       "type": "object"
     },
-    "CalibrationMeasurementTemplate": {
+    "CalibrationMeasurement": {
       "additionalProperties": false,
-      "description": "Measurement metadata a local runner combines with each observation.",
+      "description": "An externally collected, local peak-memory measurement record.",
       "properties": {
-        "record_id_prefix": {
+        "schema_version": {
+          "const": "v0.1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "record_id": {
           "minLength": 1,
-          "title": "Record Id Prefix",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "collected_at": {
+          "format": "date-time",
+          "title": "Collected At",
           "type": "string"
         },
         "backend_profile_id": {
@@ -129,6 +139,11 @@
         "inference_config": {
           "$ref": "#/$defs/CalibrationInferenceConfig"
         },
+        "observed_peak_memory_bytes": {
+          "exclusiveMinimum": 0,
+          "title": "Observed Peak Memory Bytes",
+          "type": "integer"
+        },
         "measurement_source": {
           "minLength": 1,
           "title": "Measurement Source",
@@ -157,12 +172,15 @@
           "items": {
             "$ref": "#/$defs/Evidence"
           },
+          "minItems": 1,
           "title": "Evidence",
           "type": "array"
         }
       },
       "required": [
-        "record_id_prefix",
+        "schema_version",
+        "record_id",
+        "collected_at",
         "backend_profile_id",
         "backend_version",
         "hardware_profile_id",
@@ -170,12 +188,54 @@
         "model_revision",
         "model_config_digest",
         "inference_config",
+        "observed_peak_memory_bytes",
         "measurement_source",
         "measurement_method",
         "confidence",
-        "notes"
+        "notes",
+        "evidence"
       ],
-      "title": "CalibrationMeasurementTemplate",
+      "title": "CalibrationMeasurement",
+      "type": "object"
+    },
+    "CalibrationRunFailure": {
+      "additionalProperties": false,
+      "description": "A non-sensitive failed runner attempt retained in the run result.",
+      "properties": {
+        "sample_index": {
+          "exclusiveMinimum": 0,
+          "title": "Sample Index",
+          "type": "integer"
+        },
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "return_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Return Code"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sample_index",
+        "code",
+        "return_code",
+        "message"
+      ],
+      "title": "CalibrationRunFailure",
       "type": "object"
     },
     "Confidence": {
@@ -257,10 +317,11 @@
     }
   },
   "additionalProperties": false,
-  "description": "Explicit local command contract for a repeatable calibration run.",
+  "description": "Traceable outcome of repeated local observation collection.",
   "properties": {
     "schema_version": {
       "const": "v0.1",
+      "default": "v0.1",
       "title": "Schema Version",
       "type": "string"
     },
@@ -269,60 +330,41 @@
       "title": "Run Id",
       "type": "string"
     },
-    "command": {
-      "items": {
-        "minLength": 1,
-        "type": "string"
-      },
-      "minItems": 1,
-      "title": "Command",
-      "type": "array"
-    },
-    "observation_json_path": {
+    "manifest_digest": {
       "minLength": 1,
-      "title": "Observation Json Path",
+      "title": "Manifest Digest",
       "type": "string"
     },
-    "repetitions": {
-      "default": 1,
-      "exclusiveMinimum": 0,
-      "title": "Repetitions",
-      "type": "integer"
+    "command_digest": {
+      "minLength": 1,
+      "title": "Command Digest",
+      "type": "string"
     },
-    "timeout_seconds": {
-      "default": 300,
-      "exclusiveMinimum": 0,
-      "title": "Timeout Seconds",
-      "type": "integer"
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
     },
-    "working_directory": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Working Directory"
+    "completed_at": {
+      "format": "date-time",
+      "title": "Completed At",
+      "type": "string"
     },
-    "inherit_environment": {
-      "default": true,
-      "title": "Inherit Environment",
-      "type": "boolean"
-    },
-    "environment_names": {
+    "successful_measurements": {
       "items": {
-        "minLength": 1,
-        "type": "string"
+        "$ref": "#/$defs/CalibrationMeasurement"
       },
-      "title": "Environment Names",
+      "title": "Successful Measurements",
       "type": "array"
     },
-    "measurement": {
-      "$ref": "#/$defs/CalibrationMeasurementTemplate"
+    "failures": {
+      "items": {
+        "$ref": "#/$defs/CalibrationRunFailure"
+      },
+      "title": "Failures",
+      "type": "array"
     },
-    "notes": {
+    "selected_measurement_id": {
       "anyOf": [
         {
           "type": "string"
@@ -331,19 +373,57 @@
           "type": "null"
         }
       ],
-      "title": "Notes"
+      "title": "Selected Measurement Id"
+    },
+    "conservative_peak_memory_bytes": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Conservative Peak Memory Bytes"
+    },
+    "exported_measurement_paths": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Exported Measurement Paths",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/Evidence"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "kind": {
+      "const": "calibration_run_result",
+      "type": "string"
     }
   },
   "required": [
-    "schema_version",
     "run_id",
-    "command",
-    "observation_json_path",
-    "working_directory",
-    "measurement",
-    "notes"
+    "manifest_digest",
+    "command_digest",
+    "started_at",
+    "completed_at",
+    "selected_measurement_id",
+    "conservative_peak_memory_bytes",
+    "kind"
   ],
-  "title": "CalibrationRunManifest",
+  "title": "CalibrationRunResult",
   "type": "object",
   "$schema": "https://json-schema.org/draft/2020-12/schema"
 }
