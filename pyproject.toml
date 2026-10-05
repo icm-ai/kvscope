@@ -50,7 +50,7 @@ kvscope = ["schemas/*.json", "schemas/README.md"]
 "share/kvscope/profiles/models" = ["profiles/models/*.json"]
 
 [tool.pytest.ini_options]
-addopts = "-ra"
+addopts = "-ra --cov-config=pyproject.toml"
 testpaths = ["tests"]
 
 [tool.coverage.run]

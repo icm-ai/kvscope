@@ -219,6 +219,12 @@ requirements from `pyproject.toml` and stages `wheel` for older setuptools; it d
 not download optional Hugging Face or inference extras. CI runs this preparation
 as a separate step.
 
+Default pytest options explicitly select `pyproject.toml` as the coverage config.
+Source subprocesses launched from temporary directories must retain `branch=true`
+rather than rediscovering configuration from their cwd and mixing statement-only
+and branch data. The clean installed environment still removes coverage injection
+to keep its import and resource checks isolated.
+
 `tests/integration/test_calibration_install.py` always participates in full pytest.
 It builds and installs using `--no-index` into fresh, non-system, noneditable venvs,
 then runs the installed console script outside the source checkout. Missing wheels
